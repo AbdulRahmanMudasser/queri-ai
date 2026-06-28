@@ -11,9 +11,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         if not v.startswith("postgresql+asyncpg://"):
-            raise ValueError(
-                "DATABASE_URL must use the postgresql+asyncpg:// protocol"
-            )
+            raise ValueError("DATABASE_URL must use the postgresql+asyncpg:// protocol")
         return v
 
     @field_validator("GEMINI_API_KEY")

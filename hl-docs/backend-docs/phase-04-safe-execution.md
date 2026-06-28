@@ -132,8 +132,8 @@ This document controls execution for running validated SQL queries securely on t
 - Response payloads showing query columns, rows, and summarized details.
 
 ## 12. Execution Notes
-* **Status:** Planned
-* **Started At:** [YYYY-MM-DD]
+* **Status:** In Progress
+* **Started At:** 2026-06-29
 * **Completed At:** [YYYY-MM-DD]
 * **Blockers Encountered:** None.
-* **Notes:** None.
+* **Notes:** Initiated implementation of query execution and result explanation.

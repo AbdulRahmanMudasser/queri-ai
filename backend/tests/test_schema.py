@@ -9,9 +9,7 @@ def test_schema_endpoint_returns_503_when_cache_empty(client: TestClient) -> Non
 
 
 @patch("app.api.v1.endpoints.schema.get_cached_schema")
-def test_schema_endpoint_returns_tables(
-    mock_get_cached_schema: object, client: TestClient
-) -> None:
+def test_schema_endpoint_returns_tables(mock_get_cached_schema: object, client: TestClient) -> None:
     mock_get_cached_schema.return_value = [
         {
             "name": "hotels",

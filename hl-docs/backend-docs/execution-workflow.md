@@ -41,27 +41,24 @@ Every completed phase must satisfy all of the following:
 6. Evidence is logged in the linked phase file.
 
 ## 6. Current Active Phase
-* **Current Phase:** Phase 02 - Database Connection & Schema Reader
-* **Status:** Completed
+* **Current Phase:** Phase 04 - Safe Query Execution & AI Explanation
+* **Status:** In Progress
 * **Owner:** Abdul Rahman
-* **Linked Phase Doc:** [phase-01-scaffolding.md](./phase-01-scaffolding.md)
-* **Immediate Goal:** [Completed] Set up the Poetry project, load Pydantic Settings, configure logging, and test the health check endpoint.
+* **Linked Phase Doc:** [phase-04-safe-execution.md](./phase-04-safe-execution.md)
+* **Immediate Goal:** Execute validated SQL queries inside a read-only transaction with a 5-second timeout and 100-row limit, and explain results via Gemini.
 * **Current Blockers:** None
-* **Next:** [Phase 02 - Database Connection & Schema Reader](./phase-02-database-schema.md)
+* **Next:** None (Backend MVP Complete)
 
 ## 7. Ready Queue
-- [Phase 02 - Database Connection & Schema Reader](./phase-02-database-schema.md)
-- [Phase 03 - SQL Generation & AST Validation Service](./phase-03-sql-generation.md)
-- [Phase 04 - Safe Query Execution & AI Explanation](./phase-04-safe-execution.md)
+- None
 
 ## 8. Phase Register
 | Phase | Name | Status | Priority | Owner | Depends On | Linked File | Target Window |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | 01 | Scaffolding & Core Configuration | Completed | High | Abdul Rahman | None | [phase-01-scaffolding.md](./phase-01-scaffolding.md) | 2026-06-28 |
 | 02 | Database Connection & Schema Reader | Completed | High | Abdul Rahman | Phase 01 | [phase-02-database-schema.md](./phase-02-database-schema.md) | 2026-06-28 |
-| 02 | Database Connection & Schema Reader | Planned | High | Abdul Rahman | Phase 01 | [phase-02-database-schema.md](./phase-02-database-schema.md) | [YYYY-MM-DD to YYYY-MM-DD] |
-| 03 | SQL Generation & AST Validation Service | Planned | High | Abdul Rahman | Phase 02 | [phase-03-sql-generation.md](./phase-03-sql-generation.md) | [YYYY-MM-DD to YYYY-MM-DD] |
-| 04 | Safe Query Execution & AI Explanation | Planned | High | Abdul Rahman | Phase 03 | [phase-04-safe-execution.md](./phase-04-safe-execution.md) | [YYYY-MM-DD to YYYY-MM-DD] |
+| 03 | SQL Generation & AST Validation Service | Completed | High | Abdul Rahman | Phase 02 | [phase-03-sql-generation.md](./phase-03-sql-generation.md) | 2026-06-29 |
+| 04 | Safe Query Execution & AI Explanation | In Progress | High | Abdul Rahman | Phase 03 | [phase-04-safe-execution.md](./phase-04-safe-execution.md) | 2026-06-29 |
 
 ## 9. Blockers And Risks
 
@@ -85,6 +82,8 @@ Use this section to track material execution updates, not every minor edit.
 | 2026-06-28 | Phase 01 / Scaffolding & Core Configuration | Planned -> Ready | Scoping and configurations finalized; document created and verified. | Phase 01 document loaded. |
 | 2026-06-28 | Phase 01 / Scaffolding & Core Configuration | Ready -> Completed | Poetry env, Pydantic Settings, structured logger, health endpoint, pre-commit hooks, and tests implemented. ruff, mypy, pytest all pass. | [Evidence](#11-execution-log) |
 | 2026-06-28 | Phase 02 / Database & Schema Reader | Planned -> Completed | Async engine, session dependency, metadata reader with caching, schema endpoint, and tests implemented. ruff, mypy, pytest all pass. | [Evidence](#11-execution-log) |
+| 2026-06-29 | Phase 03 / SQL Generation & AST Validation Service | Planned -> Completed | Translator with Gemini API, validator with SQLGlot safety rule analysis, generate endpoint, and tests implemented. ruff, mypy, pytest all pass. | [Evidence](#11-execution-log) |
+| 2026-06-29 | Phase 04 / Safe Query Execution & AI Explanation | Planned -> In Progress | Scoped implementation plan, setup tasks, and initiated development. | Phase 04 plan approved. |
 
 ## 12. Workflow Rules
 - Every phase listed in the phase register must have a real linked file.
