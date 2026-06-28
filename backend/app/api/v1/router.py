@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints.health import router as health_router
+from app.api.v1.endpoints.query import router as query_router
 from app.api.v1.endpoints.schema import router as schema_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
 api_router.include_router(schema_router)
+api_router.include_router(query_router)
