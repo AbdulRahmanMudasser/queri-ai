@@ -4,7 +4,7 @@
 This document is the delivery source of truth for the Backend layer. It tracks implementation order, execution status, dependencies, blockers, and completion evidence for backend-specific work.
 
 ## 2. Linked Source Documents
-* **Product Source:** [sql-assistant-prd.md](../sql-assistant-prd.md)
+* **Product Source:** [queri-ai-prd.md](../queri-ai-prd.md)
 * **Platform Build Plan:** [backend-build-plan.md](./backend-build-plan.md)
 * **Phase Template Source:** [../templates/phase-template.md](../templates/phase-template.md)
 

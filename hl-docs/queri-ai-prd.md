@@ -1,7 +1,7 @@
-# AI SQL Assistant - Product Requirements Document
+# Queri.ai - Product Requirements Document
 
 ## 1. Document Purpose
-This document is the product source of truth for the AI SQL Assistant project. It defines what is being built, for whom, why it matters, what is in scope, and how success should be judged.
+This document is the product source of truth for the Queri.ai project. It defines what is being built, for whom, why it matters, what is in scope, and how success should be judged.
 
 Use this file for:
 - product goals
@@ -18,7 +18,7 @@ Do not use this file for:
 - deployment runbooks
 
 ## 2. Executive Summary
-* **Product Name:** AI SQL Assistant (sql-assistant)
+* **Product Name:** Queri.ai (queri-ai)
 * **One-Sentence Summary:** A web application that enables non-technical users to query a PostgreSQL database using natural language and visualize the results safely and transparently.
 * **Problem Statement:** Business users, analysts, and non-technical stakeholders often need data from databases but do not know SQL, leading to bottlenecks and reliance on engineering teams.
 * **Target Audience:** Business users, analysts, and database administrators.

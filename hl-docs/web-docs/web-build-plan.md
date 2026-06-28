@@ -1,6 +1,6 @@
 # Web Build Plan & Architecture (React + Vite)
 
-This document is the technical source of truth for the Web Client layer of the AI SQL Assistant (`sql-assistant`). It records the browser-based architecture, directory conventions, UI design rules, and integration boundaries.
+This document is the technical source of truth for the Web Client layer of Queri.ai (`queri-ai`). It records the browser-based architecture, directory conventions, UI design rules, and integration boundaries.
 
 ---
 

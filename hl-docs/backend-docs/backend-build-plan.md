@@ -1,6 +1,6 @@
 # Backend Build Plan & Architecture (FastAPI)
 
-This document is the technical source of truth for the Backend API layer of the AI SQL Assistant (`sql-assistant`). It records server-side responsibilities, clean directory layers, lifecycle management, data validation, database isolation, and security rules.
+This document is the technical source of truth for the Backend API layer of Queri.ai (`queri-ai`). It records server-side responsibilities, clean directory layers, lifecycle management, data validation, database isolation, and security rules.
 
 ---
 
