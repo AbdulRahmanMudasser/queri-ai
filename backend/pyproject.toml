@@ -1,0 +1,52 @@
+[tool.poetry]
+name = "queri-ai-backend"
+version = "0.1.0"
+description = "Backend API for Queri.ai - natural language to SQL query assistant"
+authors = ["Abdul Rahman"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+pydantic-settings = "^2.7.0"
+sqlglot = "^26.0.0"
+sqlalchemy = "^2.0.0"
+asyncpg = "^0.30.0"
+google-generativeai = "^0.8.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.25.0"
+httpx = "^0.28.0"
+ruff = "^0.9.0"
+mypy = "^1.15.0"
+pre-commit = "^4.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "ARG"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+exclude = ["tests/"]
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
