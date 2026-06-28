@@ -17,7 +17,7 @@ These questions should be answered by different documents. Do not collapse them 
 ## Document Roles
 
 ### 1. Product Requirements Document
-File: `[project-name]-prd.md`
+File: `queri-ai-prd.md`
 
 This is the product source of truth.
 
@@ -122,7 +122,7 @@ Reference docs support planning. They are not the source of truth for requiremen
 
 For a new project, use the documents in this order:
 
-1. Fill `[project-name]-prd.md`
+1. Fill `queri-ai-prd.md`
 2. Keep only the platform folders that are actually in scope
 3. Fill the relevant platform build plan documents
 4. Create the matching execution workflow documents
@@ -152,7 +152,7 @@ If two documents disagree, resolve them using this precedence:
 
 Required for almost every project:
 - `README.md`
-- `[project-name]-prd.md`
+- `queri-ai-prd.md`
 - at least one platform build plan
 - at least one platform execution workflow
 - phase files for active work
