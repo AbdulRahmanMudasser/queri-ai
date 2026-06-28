@@ -30,10 +30,7 @@ def _populate_cache(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         column_info = {"name": row["column_name"], "type": row["data_type"]}
         tables.setdefault(table_name, []).append(column_info)
 
-    result = [
-        {"name": table_name, "columns": columns}
-        for table_name, columns in tables.items()
-    ]
+    result = [{"name": table_name, "columns": columns} for table_name, columns in tables.items()]
     global _schema_cache
     _schema_cache = {"tables": result}
     return result
