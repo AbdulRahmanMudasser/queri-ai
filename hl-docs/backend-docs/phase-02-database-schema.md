@@ -76,19 +76,19 @@ This document controls execution for establishing connection pools to PostgreSQL
 
 ### A. Data Layer
 * [NEW] `backend/app/db/session.py`:
-  - [ ] Initialize SQLAlchemy `create_async_engine` and `sessionmaker`.
-  - [ ] Write async dependency `get_db()`.
+  - [x] Initialize SQLAlchemy `create_async_engine` and `sessionmaker`.
+  - [x] Write async dependency `get_db()`.
 * [NEW] `backend/app/db/reader.py`:
-  - [ ] Write database metadata inspection queries using `asyncpg` raw queries or SQLAlchemy sessions against `information_schema`.
-  - [ ] Implement caching mechanism for schema retrieval.
+  - [x] Write database metadata inspection queries using SQLAlchemy sessions against `information_schema`.
+  - [x] Implement caching mechanism for schema retrieval.
 
 ### B. Controller / API Layer
 * [NEW] `backend/app/api/v1/endpoints/schema.py`:
-  - [ ] Define route handler for `GET /api/v1/schema` calling the metadata caching service.
+  - [x] Define route handler for `GET /api/v1/schema` calling the metadata caching service.
 * [MODIFY] `backend/app/api/v1/router.py`:
-  - [ ] Include the schema router endpoints.
+  - [x] Include the schema router endpoints.
 * [MODIFY] `backend/app/main.py`:
-  - [ ] Pre-populate schema cache in lifespan startup.
+  - [x] Pre-populate schema cache in lifespan startup.
 
 ### C. Client / UI Layer
 * `No UI changes in this phase`
@@ -119,8 +119,14 @@ This document controls execution for establishing connection pools to PostgreSQL
 - JSON response payload from schema endpoint.
 
 ## 12. Execution Notes
-* **Status:** Planned
-* **Started At:** [YYYY-MM-DD]
-* **Completed At:** [YYYY-MM-DD]
+* **Status:** Completed
+* **Started At:** 2026-06-28
+* **Completed At:** 2026-06-28
 * **Blockers Encountered:** None.
-* **Notes:** None.
+* **Notes:**
+  - `ruff check .` — All checks passed.
+  - `mypy app/` — Success: no issues found in 14 source files.
+  - `pytest` — 3 passed (health, schema 503, schema mocked).
+  - Schema cache populated at startup via lifespan; graceful fallback if DB unavailable.
+  - `GET /api/v1/schema` returns 503 when cache is empty.
+  - `POST /api/v1/schema/reload` manually triggers a schema reload.

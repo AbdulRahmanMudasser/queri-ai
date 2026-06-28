@@ -60,22 +60,22 @@ This document controls execution for the initial scaffolding of the FastAPI back
 ### A. Data Layer
 * [NEW] `backend/pyproject.toml`:
   - **Target Anchor:** File creation
-  - [ ] Add poetry dependencies: `fastapi`, `uvicorn[standard]`, `pydantic-settings`, `sqlglot`, `sqlalchemy`, `asyncpg`, `google-generativeai`.
-  - [ ] Add `[tool.ruff]` and `[tool.mypy]` config sections with strict rules.
+  - [x] Add poetry dependencies: `fastapi`, `uvicorn[standard]`, `pydantic-settings`, `sqlglot`, `sqlalchemy`, `asyncpg`, `google-generativeai`.
+  - [x] Add `[tool.ruff]` and `[tool.mypy]` config sections with strict rules.
 * [NEW] `backend/.pre-commit-config.yaml`:
-  - [ ] Add hooks for `ruff` formatting/linting and `mypy` strict type checking.
+  - [x] Add hooks for `ruff` formatting/linting and `mypy` strict type checking.
 
 ### B. Controller / API Layer
 * [NEW] `backend/app/core/config.py`:
-  - [ ] Define `Settings(BaseSettings)` class. Add a field validator for `DATABASE_URL` format.
+  - [x] Define `Settings(BaseSettings)` class. Add a field validator for `DATABASE_URL` format.
 * [NEW] `backend/app/core/logger.py`:
-  - [ ] Set up structured logger using standard library dictionary configuration.
+  - [x] Set up structured logger using standard library dictionary configuration.
 * [NEW] `backend/app/api/v1/endpoints/health.py`:
-  - [ ] Define the health route returning status and environment.
+  - [x] Define the health route returning status and environment.
 * [NEW] `backend/app/api/v1/router.py`:
-  - [ ] Create and export the APIRouter assembling all v1 endpoints.
+  - [x] Create and export the APIRouter assembling all v1 endpoints.
 * [NEW] `backend/app/main.py`:
-  - [ ] Instantiate `FastAPI` with lifespan event handlers. Connect CORS middleware and APIRouter.
+  - [x] Instantiate `FastAPI` with lifespan event handlers. Connect CORS middleware and APIRouter.
 
 ### C. Client / UI Layer
 * `No UI changes in this phase`
@@ -109,8 +109,13 @@ This document controls execution for the initial scaffolding of the FastAPI back
 - Output from health check curl query.
 
 ## 12. Execution Notes
-* **Status:** Ready
-* **Started At:** [YYYY-MM-DD]
-* **Completed At:** [YYYY-MM-DD]
+* **Status:** Completed
+* **Started At:** 2026-06-28
+* **Completed At:** 2026-06-28
 * **Blockers Encountered:** None.
-* **Notes:** None.
+* **Notes:**
+  - `poetry install` resolved all dependencies successfully (69 packages).
+  - `ruff check .` — All checks passed.
+  - `mypy app/` — Success: no issues found in 10 source files.
+  - `pytest -v` — 1 passed (health check endpoint).
+  - Pre-commit config includes hooks for ruff (lint + format) and mypy (strict).
