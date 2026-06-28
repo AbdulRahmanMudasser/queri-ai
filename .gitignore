@@ -1,0 +1,31 @@
+# Project Specific Ignores
+/hl-docs/templates/
+/hl-docs/reference-docs/
+/hl-docs/deployment-docs/
+
+# Root .env (will be added when backend scaffolding starts)
+
+# Python Ignores
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontend Ignores
+node_modules/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+
+# Logs and databases
+*.log
+*.sqlite
+*.dump
