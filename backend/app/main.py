@@ -44,6 +44,7 @@ async def global_exception_handler(_request: Request, exc: Exception) -> JSONRes
         content={"detail": "Internal server error"},
     )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
