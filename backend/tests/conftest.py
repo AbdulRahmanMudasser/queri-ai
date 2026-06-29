@@ -26,3 +26,22 @@ def mock_db_session() -> Generator[AsyncMock, None, None]:
         mock_sessionmaker.return_value.__aenter__ = AsyncMock(return_value=mock_session)
         mock_sessionmaker.return_value.__aexit__ = AsyncMock(return_value=None)
         yield mock_session
+
+
+@pytest.fixture(autouse=True)
+def mock_embeddings_provider() -> Generator[MagicMock, None, None]:
+    from app.services.embeddings import EmbeddingsProvider
+
+    class DummyEmbeddingsProvider(EmbeddingsProvider):
+        async def get_embedding(self, text: str) -> list[float]:
+            import hashlib
+
+            h = hashlib.md5(text.encode("utf-8")).digest()
+            # Return 384 floats (all-MiniLM size)
+            return [float(b) / 255.0 for b in h] * 24
+
+    mock_provider = DummyEmbeddingsProvider()
+    target_path = "app.api.v1.endpoints.query.get_embeddings_provider"
+    with patch(target_path, return_value=mock_provider) as p:
+        yield p
+

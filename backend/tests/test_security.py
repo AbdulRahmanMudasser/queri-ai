@@ -97,6 +97,24 @@ class TestValidateSql:
         with pytest.raises(ValueError, match="unsafe operation"):
             validate_sql("SHOW max_connections")
 
+    def test_schema_validation_valid(self) -> None:
+        sql = "SELECT name FROM hotels WHERE id = 1"
+        result = validate_sql(sql, schema=MOCK_SCHEMA)
+        assert "SELECT" in result
+
+    def test_schema_validation_invalid_table(self) -> None:
+        with pytest.raises(ValueError, match="Table 'non_existent' does not exist"):
+            validate_sql("SELECT * FROM non_existent", schema=MOCK_SCHEMA)
+
+    def test_schema_validation_invalid_column(self) -> None:
+        with pytest.raises(ValueError, match="Column 'hotel_mail' does not exist"):
+            validate_sql("SELECT hotel_mail FROM hotels", schema=MOCK_SCHEMA)
+
+    def test_schema_validation_cte_valid(self) -> None:
+        sql = "WITH recent AS (SELECT name AS hotel_name FROM hotels) SELECT hotel_name FROM recent"
+        result = validate_sql(sql, schema=MOCK_SCHEMA)
+        assert "SELECT" in result
+
 
 MOCK_SCHEMA = [
     {
@@ -125,9 +143,15 @@ class TestGenerateEndpoint:
         mock_translate: object,
         mock_get_cached_schema: object,
         client: TestClient,
+        mock_db_session: object,
     ) -> None:
+        _ = mock_db_session
         mock_get_cached_schema.return_value = MOCK_SCHEMA
-        mock_translate.return_value = "SELECT name FROM hotels WHERE id = 1"
+        mock_translate.return_value = {
+            "sql": "SELECT name FROM hotels WHERE id = 1",
+            "reasoning": "User wants hotel names",
+            "tables_used": ["hotels"],
+        }
 
         response = client.post(
             "/api/v1/query/generate",
@@ -137,6 +161,7 @@ class TestGenerateEndpoint:
         data = response.json()
         assert "sql" in data
         assert "SELECT" in data["sql"]
+        assert "reasoning" in data
 
     @patch("app.api.v1.endpoints.query.get_cached_schema")
     @patch("app.api.v1.endpoints.query.translate")
@@ -145,9 +170,15 @@ class TestGenerateEndpoint:
         mock_translate: object,
         mock_get_cached_schema: object,
         client: TestClient,
+        mock_db_session: object,
     ) -> None:
+        _ = mock_db_session
         mock_get_cached_schema.return_value = MOCK_SCHEMA
-        mock_translate.return_value = "DROP TABLE bookings"
+        mock_translate.return_value = {
+            "sql": "DROP TABLE bookings",
+            "reasoning": "Attempt to delete bookings",
+            "tables_used": ["bookings"],
+        }
 
         response = client.post(
             "/api/v1/query/generate",
@@ -161,7 +192,9 @@ class TestGenerateEndpoint:
         self,
         mock_get_cached_schema: object,
         client: TestClient,
+        mock_db_session: object,
     ) -> None:
+        _ = mock_db_session
         mock_get_cached_schema.side_effect = RuntimeError("Schema cache not loaded")
 
         response = client.post(
@@ -177,7 +210,9 @@ class TestGenerateEndpoint:
         mock_translate: object,
         mock_get_cached_schema: object,
         client: TestClient,
+        mock_db_session: object,
     ) -> None:
+        _ = mock_db_session
         mock_get_cached_schema.return_value = MOCK_SCHEMA
         mock_translate.side_effect = Exception("API error")
 
