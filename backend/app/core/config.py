@@ -6,6 +6,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     GEMINI_API_KEY: str
     ENV: str = "development"
+    EMBEDDING_PROVIDER: str = "local"
+
+    @field_validator("EMBEDDING_PROVIDER")
+    @classmethod
+    def validate_embedding_provider(cls, v: str) -> str:
+        if v not in ("local", "gemini"):
+            raise ValueError("EMBEDDING_PROVIDER must be 'local' or 'gemini'")
+        return v
 
     @field_validator("DATABASE_URL")
     @classmethod
