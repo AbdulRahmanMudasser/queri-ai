@@ -7,7 +7,7 @@ This document is the technical source of truth for the Web Client layer of Queri
 ## 1. Platform Summary
 * **Platform Name:** Web Frontend Client
 * **Primary Responsibility:** Deliver a responsive browser-based dashboard. This includes letting users inspect the active database schema, input queries, preview generated SQL, run execution, and read AI explanations.
-* **Key Interfaces:** FastAPI Backend Services (`/api/schema`, `/api/generate-sql`, `/api/execute-query`, `/api/explain-results`).
+* **Key Interfaces:** FastAPI Backend Services (`/api/v1/schema`, `/api/v1/query/generate`, `/api/v1/query/execute`, `/api/v1/query/explain`).
 * **Primary Risks:** Slow rendering of large result sets, layout breakage on mobile/tablet screens, inconsistent loading states.
 
 ---
@@ -71,9 +71,9 @@ frontend/
 ## 5. Data Flow And State Strategy
 * **Local State Model:** React `useState` and `useContext` for state management (schema data, history array, active selected query, loading state, results grid, error states).
 * **Data Retrieval Flow:**
-  - **On Mount:** Load database schema from `GET /api/schema` to populate the sidebar tree view. Load history from `localStorage`.
-  - **On Question Submit:** Call `POST /api/generate-sql` -> set returned SQL to state -> scroll SQL preview panel into view.
-  - **On Execute Query:** Call `POST /api/execute-query` -> set columns/rows to state -> immediately call `POST /api/explain-results` -> set explanation text.
+  - **On Mount:** Load database schema from `GET /api/v1/schema` to populate the sidebar tree view. Load history from `localStorage`.
+  - **On Question Submit:** Call `POST /api/v1/query/generate` passing optional user role header `X-User-Role` -> set returned SQL and reasoning to state -> scroll SQL preview panel into view.
+  - **On Execute Query:** Call `POST /api/v1/query/execute` -> set columns/rows to state -> immediately call `POST /api/v1/query/explain` -> set explanation text.
 * **Persistence Strategy:** Save successful query actions (question, generated SQL, datetime) to `localStorage` so users can reload past inputs without re-querying the generator.
 
 ---
@@ -81,9 +81,9 @@ frontend/
 ## 6. Domain Models And Contracts
 * All data model types must mirror the FastAPI Pydantic responses:
   * `SchemaResponse`: `{ tables: Array<{ name: string, columns: Array<{ name: string, type: string }> }> }`
-  * `SQLResponse`: `{ sql: string }`
-  * `ExecutionResponse`: `{ columns: string[], rows: any[][] }`
-  * `ExplanationResponse`: `{ explanation: string }`
+  * `QueryResponse`: `{ sql: string, reasoning: string, tables_used: string[] }`
+  * `ExecuteResponse`: `{ columns: string[], rows: any[][] }`
+  * `ExplainResponse`: `{ explanation: string }`
 
 ---
 

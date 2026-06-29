@@ -93,16 +93,16 @@ This document controls execution for running validated SQL queries securely on t
 
 ### A. Data Layer
 * [MODIFY] `backend/app/db/session.py`:
-  - [ ] Add transaction interceptors or helper variables to enforce `READ ONLY` connection locks.
+  - [x] Add transaction interceptors or helper variables to enforce `READ ONLY` connection locks.
 
 ### B. Controller / API Layer
 * [MODIFY] `backend/app/api/v1/endpoints/query.py`:
-  - [ ] Implement `POST /api/v1/query/execute` endpoint. Incorporate SQL validation check, async execution statement timeouts, and row cap limit logic.
-  - [ ] Implement `POST /api/v1/query/explain` endpoint. Formulate prompt containing the question and table data, call Gemini API, and return the summary.
+  - [x] Implement `POST /api/v1/query/execute` endpoint. Incorporate SQL validation check, async execution statement timeouts, and row cap limit logic.
+  - [x] Implement `POST /api/v1/query/explain` endpoint. Formulate prompt containing the question and table data, call Gemini API, and return the summary.
 * [NEW] `backend/tests/conftest.py`:
-  - [ ] Configure client adapters and mock dependencies (mocking Gemini API calls and database connections).
+  - [x] Configure client adapters and mock dependencies (mocking Gemini API calls and database connections).
 * [NEW] `backend/tests/test_routes.py`:
-  - [ ] Write integration test cases for endpoints `/schema`, `/query/generate`, `/query/execute`, and `/query/explain`.
+  - [x] Write integration test cases for endpoints `/schema`, `/query/generate`, `/query/execute`, and `/query/explain`.
 
 ### C. Client / UI Layer
 * `No UI changes in this phase`
@@ -132,8 +132,8 @@ This document controls execution for running validated SQL queries securely on t
 - Response payloads showing query columns, rows, and summarized details.
 
 ## 12. Execution Notes
-* **Status:** In Progress
+* **Status:** Completed
 * **Started At:** 2026-06-29
-* **Completed At:** [YYYY-MM-DD]
+* **Completed At:** 2026-06-29
 * **Blockers Encountered:** None.
-* **Notes:** Initiated implementation of query execution and result explanation.
+* **Notes:** Completed implementation of query execution and result explanation.

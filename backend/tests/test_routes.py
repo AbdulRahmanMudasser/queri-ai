@@ -24,7 +24,38 @@ class MockResult:
         return self._rows[:size]
 
 
-def test_execute_query_happy_path(client: TestClient, mock_db_session: AsyncMock) -> None:
+MOCK_SCHEMA = [
+    {
+        "name": "hotels",
+        "columns": [
+            {"name": "id", "type": "integer"},
+            {"name": "name", "type": "character varying"},
+            {"name": "city", "type": "character varying"},
+        ],
+    },
+    {
+        "name": "bookings",
+        "columns": [
+            {"name": "id", "type": "integer"},
+            {"name": "hotel_id", "type": "integer"},
+        ],
+    },
+    {
+        "name": "non_existent_table",
+        "columns": [
+            {"name": "id", "type": "integer"},
+        ],
+    },
+]
+
+
+@patch("app.api.v1.endpoints.query.get_cached_schema")
+def test_execute_query_happy_path(
+    mock_get_cached_schema: object,
+    client: TestClient,
+    mock_db_session: AsyncMock,
+) -> None:
+    mock_get_cached_schema.return_value = MOCK_SCHEMA
     mock_db_session.execute.return_value = MockResult(
         ["name", "city"],
         [("Marriott", "Lahore"), ("Pearl Continental", "Lahore")],
@@ -45,7 +76,13 @@ def test_execute_query_happy_path(client: TestClient, mock_db_session: AsyncMock
     assert mock_db_session.execute.call_count >= 3
 
 
-def test_execute_query_unsafe(client: TestClient, mock_db_session: AsyncMock) -> None:
+@patch("app.api.v1.endpoints.query.get_cached_schema")
+def test_execute_query_unsafe(
+    mock_get_cached_schema: object,
+    client: TestClient,
+    mock_db_session: AsyncMock,
+) -> None:
+    mock_get_cached_schema.return_value = MOCK_SCHEMA
     response = client.post(
         "/api/v1/query/execute",
         json={"sql": "DROP TABLE bookings"},
@@ -55,7 +92,13 @@ def test_execute_query_unsafe(client: TestClient, mock_db_session: AsyncMock) ->
     assert mock_db_session.execute.call_count == 0
 
 
-def test_execute_query_syntax_error(client: TestClient, mock_db_session: AsyncMock) -> None:
+@patch("app.api.v1.endpoints.query.get_cached_schema")
+def test_execute_query_syntax_error(
+    mock_get_cached_schema: object,
+    client: TestClient,
+    mock_db_session: AsyncMock,
+) -> None:
+    mock_get_cached_schema.return_value = MOCK_SCHEMA
     orig_exc = Exception('syntax error at or near "FROM"')
     orig_exc.sqlstate = "42601"  # syntax error code
 
@@ -75,7 +118,13 @@ def test_execute_query_syntax_error(client: TestClient, mock_db_session: AsyncMo
     assert "Database execution error" in response.json()["detail"]
 
 
-def test_execute_query_timeout(client: TestClient, mock_db_session: AsyncMock) -> None:
+@patch("app.api.v1.endpoints.query.get_cached_schema")
+def test_execute_query_timeout(
+    mock_get_cached_schema: object,
+    client: TestClient,
+    mock_db_session: AsyncMock,
+) -> None:
+    mock_get_cached_schema.return_value = MOCK_SCHEMA
     orig_exc = Exception("canceling statement due to statement timeout")
     orig_exc.sqlstate = "57014"  # timeout code
 

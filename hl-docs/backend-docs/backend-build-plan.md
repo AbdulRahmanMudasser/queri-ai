@@ -6,9 +6,9 @@ This document is the technical source of truth for the Backend API layer of Quer
 
 ## 1. Platform Summary
 * **Platform Name:** Backend API Service
-* **Primary Responsibility:** Enforce security policies, read database metadata, translate natural language requests to SQL queries, validate SQL queries using AST analysis, execute queries against a read-only PostgreSQL instance, and summarize results.
+* **Primary Responsibility:** Enforce security policies, read database metadata, prune schema context using a modular local/cloud semantic embeddings engine and custom cosine similarity matching, translate queries to SQL under a structured JSON model, validate SQL syntax and columns via AST analysis, execute queries against a read-only PostgreSQL instance, implement automated self-correction query retries, and summarize results.
 * **Key Interfaces:** React Web Client, PostgreSQL Database (Neon), Google Gemini API (via `google-generativeai` SDK).
-* **Primary Risks:** SQL Injection, database performance exhaustion (long-running queries), LLM hallucinations (referencing invalid columns/tables), bypass of SQL validator.
+* **Primary Risks:** SQL Injection, database performance exhaustion (long-running queries), LLM hallucinations (referencing invalid columns/tables), bypass of SQL validator, high API token usage.
 
 ---
 
@@ -19,7 +19,8 @@ This document is the technical source of truth for the Backend API layer of Quer
 * **SQL Parsing & Validation:** SQLGlot (for parsing and inspecting SQL ASTs)
 * **Database Client:** SQLAlchemy (with `asyncpg` for asynchronous PostgreSQL access)
 * **Data Validation & Settings:** Pydantic v2 & `pydantic-settings`
-* **LLM SDK:** `google-generativeai` (Gemini API SDK)
+* **Semantic Embeddings:** `fastembed` (for local, CPU-bound ONNX embedding generation)
+* **LLM SDK:** `google-generativeai` (Gemini API SDK for translation and embeddings)
 * **Testing Stack:** Pytest, pytest-asyncio, HTTPX (for client testing)
 
 ---
@@ -28,14 +29,19 @@ This document is the technical source of truth for the Backend API layer of Quer
 
 ### This Platform Owns
 - Extracting database schemas (tables, columns, types) dynamically from PostgreSQL.
-- Constructing prompts containing schemas and querying the LLM for translation.
-- Strict parsing and AST checking of generated/incoming queries to prevent DDL (Data Definition) or DML (Data Modification) statements.
-- Direct read-only database query execution with transaction timeouts.
+- Abstracting embeddings generation under a plug-and-play `EmbeddingsProvider` interface supporting both `LocalEmbeddings` (fastembed) and `GeminiEmbeddings` (Gemini API).
+- Implementing an in-memory vector database matching system utilizing Cosine Similarity math.
+- Storing few-shot SQL examples and business rules in database tables, dynamically seeded on startup.
+- Dynamically retrieving query-relevant schemas using adaptive cosine similarity score thresholds (score >= 0.35, with a top-3 fallback) to construct minimized prompts.
+- Forcing structured JSON schema output from Gemini to prevent parsing issues.
+- Parsing SQL strings into ASTs to check command allowlists, stacked queries, and verify column/table names against cached catalogs.
+- Running a single-attempt self-correction query retry if execution throws errors.
+- Enforcing read-only transactions with timeouts and row limits.
 - Wrapping query results in structured, JSON-serializable payloads.
 
 ### This Platform Does Not Own
 - Rendering user interface components or client routing.
-- Maintaining permanent user session states (stateless API model for MVP).
+- Maintaining permanent database state changes (read-only architecture).
 
 ---
 
@@ -63,8 +69,11 @@ backend/
 │   │   ├── request.py              # Pydantic input validation models
 │   │   └── response.py             # Pydantic response filtration models
 │   ├── services/
-│   │   ├── translator.py           # LLM interaction & prompt building logic
-│   │   └── validator.py            # SQLGlot AST validation rules
+│   │   ├── translator.py           # LLM translation & result explanation (JSON mode)
+│   │   ├── validator.py            # SQLGlot AST validation rules & column catalog verification
+│   │   ├── context.py              # Schema context builder, pruning, and business rules registry
+│   │   ├── embeddings.py           # Abstract EmbeddingsProvider (Local CPU ONNX / Gemini Cloud API)
+│   │   └── history.py              # Conversation query memory manager
 │   └── main.py                     # App lifespan, middleware setup, CORS, and root app instantiation
 ├── tests/
 │   ├── conftest.py                 # Pytest setup and mock dependencies
@@ -98,20 +107,23 @@ backend/
 * **Primary Data Retrieval Model:** Asynchronous request-driven database queries.
 * **Schema Reader Strategy:** Schema is queried from the PostgreSQL `information_schema` catalogs at startup and cached in-memory.
 * **SQL Generation Flow:**
-  1. Frontend submits a question to `POST /api/v1/query/generate`.
-  2. Router calls `translator.py` service.
-  3. Service reads schema, constructs prompt, calls Gemini API, and passes query through `validator.py`.
-  4. If validation passes, return SQL.
+  1. Frontend submits a question to `POST /api/v1/query/generate` along with optional role headers.
+  2. Router calls `context.py` to retrieve relevant context.
+  3. The `context.py` service runs semantic similarity search (using a local ONNX model or Gemini Cloud API via `embeddings.py` and custom cosine similarity math) on table/column definitions and prunes the schema context.
+  4. The service fetches the 2 closest few-shot query examples and retrieves any matching business rules.
+  5. The consolidated context is sent to `translator.py`, which prompts Gemini under a structured JSON response schema (`reasoning`, `sql`, `tables_used`).
+  6. The generated SQL is validated through `validator.py`. If validation passes, the SQL and reasoning are returned.
 * **Query Execution Flow:**
   1. Frontend submits SQL query to `POST /api/v1/query/execute`.
-  2. Router calls the execution handler.
-  3. Router runs `validator.py` AST analysis (defense-in-depth recheck).
-  4. Query is executed within a read-only transaction capped at 100 rows and a 5-second timeout.
+  2. Router calls the execution handler in `query.py`.
+  3. The execution handler runs `validator.py` AST validation to block write/modify operations and ensure that all table and column names match the cached schema catalog.
+  4. If a mismatch is detected, or if database execution returns a syntax/execution error, the execution handler intercepts the exception and invokes a single-attempt retry loop, requesting Gemini to correct the SQL based on the error output.
+  5. The validated (or corrected) query is executed within a read-only transaction capped at 100 rows and a 5-second timeout.
 
 ---
 
 ## 7. Error Handling And Reliability
-* **Validation Failures:** If a query contains blocked statements, raise a custom exception that is caught by a global exception handler, returning an HTTP `400 Bad Request` with `{"detail": "Blocked: unsafe query detected"}`.
+* **Validation Failures:** If a query contains blocked statements or invalid columns, raise a custom exception that is caught by a global exception handler, returning an HTTP `400 Bad Request`.
 * **Database Timeouts:** Catch transaction timeouts and return an HTTP `408 Request Timeout` response.
 
 ---
@@ -122,6 +134,8 @@ backend/
   * Parse SQL into a SQLGlot AST: `expression = sqlglot.parse_one(sql)`.
   * Traverse AST nodes and verify they only consist of `Select` or `With` command nodes.
   * Block statements containing syntax errors or multiple execution statements separated by semicolons (to block stacked query injection).
+  * **AST Column and Table Verification:** Verify that every table and column node present in the AST matches our cached schema catalog. Any reference to unmapped database elements throws a validation exception.
+* **Role-Based Schema Masking:** Mask sensitive tables and columns from the schema context and similarity indexes depending on the user's role headers before passing them to the translation layer.
 * **Transaction Isolation:** Prepend `SET TRANSACTION READ ONLY` or run statements under a read-only connection cursor context.
 
 ---
