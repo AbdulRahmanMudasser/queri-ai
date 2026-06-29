@@ -59,7 +59,7 @@ This document controls execution for translating user questions into SQL via Gem
 - SQLGlot AST validation correctly allows standard `SELECT` and `WITH` CTEs.
 - SQLGlot AST validation blocks stacked queries (multiple queries separated by semicolons).
 - SQLGlot AST validation blocks all database modification statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `GRANT`).
-- Translator system builds context prompts incorporating active schemas and prompts Gemini 1.5 Flash.
+- Translator system builds context prompts incorporating active schemas and prompts Gemini 2.5 Flash Lite.
 - Endpoint `POST /api/v1/query/generate` works end-to-end and has a comprehensive test suite.
 
 ## 9. Implementation Steps (Component Audit)

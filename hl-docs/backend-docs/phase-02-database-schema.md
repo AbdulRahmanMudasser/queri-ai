@@ -129,4 +129,3 @@ This document controls execution for establishing connection pools to PostgreSQL
   - `pytest` — 3 passed (health, schema 503, schema mocked).
   - Schema cache populated at startup via lifespan; graceful fallback if DB unavailable.
   - `GET /api/v1/schema` returns 503 when cache is empty.
-  - `POST /api/v1/schema/reload` manually triggers a schema reload.

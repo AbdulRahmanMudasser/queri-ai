@@ -33,8 +33,10 @@ This document controls execution for rendering generated SQL queries in a termin
 * **Endpoint:** `POST /api/v1/query/generate`
 * **Response payload mapping:**
   ```typescript
-  interface SQLResponse {
+  interface QueryResponse {
     sql: string;
+    reasoning: string;
+    tables_used: string[];
   }
   ```
 
@@ -57,7 +59,7 @@ This document controls execution for rendering generated SQL queries in a termin
 
 ### A. Data Layer
 * [MODIFY] `frontend/src/utils/api.ts`:
-  - [ ] Write `generateSQL(question: string): Promise<SQLResponse>` fetch call.
+  - [ ] Write `generateSQL(question: string): Promise<QueryResponse>` fetch call.
 
 ### B. Controller / API Layer
 * `No backend routes in this phase`

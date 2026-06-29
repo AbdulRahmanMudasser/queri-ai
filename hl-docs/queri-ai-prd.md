@@ -76,14 +76,21 @@ Do not use this file for:
 ## 7. Feature Scope
 
 ### In Scope
-- **Schema Reader:** Dynamically reads PostgreSQL tables, columns, data types, and relationships.
-- **Natural Language Input:** Chat-like or query-like input field.
-- **SQL Generation:** Translates English to PostgreSQL using Gemini / Claude / OpenAI.
-- **SQL Validation:** Checks generated SQL using sqlglot to verify syntax and block dangerous keywords.
-- **Query Execution:** Executes validated SQL on a read-only PostgreSQL connection.
-- **Result Table:** Renders results in an interactive, responsive grid/table.
-- **AI Explanation:** Provides a text summary explaining the query results.
-- **Query History:** Lists past queries and generated SQL.
+- **Schema Reader**: Dynamically reads PostgreSQL tables, columns, data types, and relationships.
+- **Context Builder Service**: Semantically prunes database schemas using adaptive similarity score thresholds (retaining tables with score >= 0.35, with a top-3 fallback) to optimize input prompt costs.
+- **SQL Few-Shot Example RAG**: Searches and retrieves database-backed historical query examples matching user queries via cosine similarity to guide translation.
+- **Business Rules Registry**: Integrates database-backed enterprise mappings (e.g. status codes, active record states) to guide the LLM's query generation logic.
+- **Structured Outputs (JSON)**: Configures Gemini to return a structured JSON response schema mapping reasoning, SQL, and tables used.
+- **Pre-Execution Column Validation**: Verifies that all columns and tables in the parsed SQL AST exist in the database schema catalog before running queries.
+- **Self-Correction Retry Loop**: Automatically intercepts DB syntax/column errors and invokes a one-time LLM query correction loop.
+- **Role-Based Schema Masking**: Dynamically filters unauthorized tables and columns from the schema context based on user roles.
+- **Natural Language Input**: Chat-like or query-like input field.
+- **SQL Generation**: Translates English to PostgreSQL using Gemini.
+- **SQL Validation**: Checks generated SQL using sqlglot to verify syntax and block dangerous keywords.
+- **Query Execution**: Executes validated SQL on a read-only PostgreSQL connection.
+- **Result Table**: Renders results in an interactive, responsive grid/table.
+- **AI Explanation**: Provides a text summary explaining the query results.
+- **Query History**: Lists past queries and generated SQL.
 
 ### Out Of Scope
 - Charts, graphs, and visual dashboards (deferred to V2).
@@ -92,21 +99,25 @@ Do not use this file for:
 - Complex multi-step agent reasoning (e.g., query, inspect, write code, run another query).
 
 ## 8. Platform Scope
-* **Backend Service:** FastAPI (Python) - asynchronous, lightweight, leveraging sqlglot for SQL parsing/validation and asyncpg / SQLAlchemy for async Postgres connections.
-* **Web Application:** React + Vite (Single Page Application) - built using modern CSS, clean component architecture, and responsive layouts.
-* **Other Surfaces:** None for MVP.
+* **Backend Service**: FastAPI (Python) - asynchronous, lightweight, leveraging sqlglot for SQL parsing/validation and asyncpg / SQLAlchemy for async Postgres connections.
+* **Web Application**: React + Vite (Single Page Application) - built using modern CSS, clean component architecture, and responsive layouts.
+* **Other Surfaces**: None for MVP.
 
 ## 9. Functional Requirements
-- **FR-1 (Schema Extraction):** The backend must expose a GET `/api/schema` endpoint returning the database structure.
-- **FR-2 (SQL Generation):** The backend must expose POST `/api/generate-sql` which uses LLM API to translate a question into SQL.
-- **FR-3 (SQL Validation):** Before executing or returning, all SQL queries must be parsed using sqlglot and checked against an allowlist of statements (only `SELECT` and `WITH` allowed).
-- **FR-4 (Execution):** The backend must expose POST `/api/execute-query` which runs validated SQL and returns the rows.
-- **FR-5 (Visualization):** The frontend must render rows in a clean, scrollable, and header-aligned table.
-- **FR-6 (Explanation):** The LLM must summarize the query results in simple terms.
+- **FR-1 (Schema Extraction)**: The backend must expose a GET `/api/schema` endpoint returning the database structure.
+- **FR-2 (SQL Generation)**: The backend must expose POST `/api/generate-sql` which uses LLM API to translate a question into SQL.
+- **FR-3 (SQL Validation)**: Before executing or returning, all SQL queries must be parsed using sqlglot and checked against an allowlist of statements (only `SELECT` and `WITH` allowed).
+- **FR-4 (Execution)**: The backend must expose POST `/api/execute-query` which runs validated SQL and returns the rows.
+- **FR-5 (Visualization)**: The frontend must render rows in a clean, scrollable, and header-aligned table.
+- **FR-6 (Explanation)**: The LLM must summarize the query results in simple terms.
 
 ## 10. Acceptance Criteria
 - The system must never execute any statement containing INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or GRANT, even if wrapped in subqueries or CTEs.
 - The system must connect to the database using credentials that are strictly read-only at the database level.
+- The system must enforce Gemini to return a structured JSON response schema mapping reasoning, SQL, and tables used.
+- The system must block execution of queries containing any table or column names that do not match the cached database schema catalog.
+- If a query fails with a database syntax error or column mismatch, the system must trigger at most one self-correction retry loop before returning an error.
+- The system must restrict schema mapping context and similarity indexes based on user security roles, masking sensitive tables.
 - The frontend must show the generated SQL before running it.
 - Database execution timeouts must be capped at 5 seconds to prevent denial of service (DoS) from heavy queries.
 - Query results must be capped at a default limit of 100 rows if the user query does not specify a LIMIT.
@@ -115,48 +126,49 @@ Do not use this file for:
 - The frontend codebase must pass strict TypeScript compilation and ESLint checks.
 
 ## 11. Success Metrics
-* **Primary Metric:** Query success rate > 95% (user gets correct SQL and correct result).
-* **Secondary Metrics:**
+* **Primary Metric**: Query success rate > 95% (user gets correct SQL and correct result).
+* **Secondary Metrics**:
   - SQL validation success rate > 99%.
   - Zero destructive query execution incidents.
-* **Measurement Window:** 30 days after launch.
+* **Measurement Window**: 30 days after launch.
 
 ## 12. Assumptions
 - The target database is relatively small or indexed properly so that read-only queries do not hang.
 - The LLM has access to the database schema context to generate accurate joins.
 
 ## 13. Dependencies
-- **AI Provider:** Google Gemini API keys.
-- **Database:** A running PostgreSQL instance (or Neon project).
-- **Tooling & Environments:** Poetry (Python dependency & environment management), Ruff (linting/formatting), Mypy (type checking), Husky (Git pre-commit hooks).
-- **Libraries:** sqlglot (SQL validation), pydantic-settings, asyncpg, sqlalchemy.
+- **AI Provider**: Google Gemini API keys.
+- **Database**: A running PostgreSQL instance (or Neon project).
+- **Tooling & Environments**: Poetry (Python dependency & environment management), Ruff (linting/formatting), Mypy (type checking), Husky (Git pre-commit hooks).
+- **Libraries**: sqlglot (SQL validation), pydantic-settings, asyncpg, sqlalchemy.
 
 ## 14. Risks And Open Questions
 
 ### Risks
-- **LLM Hallucinations:** The LLM might generate incorrect table or column names if the schema context is too large or ambiguous.
-  - *Mitigation:* The system schema reader will pass exact column definitions, and the validation layer will verify table/column existence where possible.
-- **Heavy Queries:** Users might ask questions that translate to extremely expensive joins.
-  - *Mitigation:* Set tight timeouts and limit returned rows (e.g., append LIMIT 100 if no limit is specified).
+- **LLM Hallucinations**: The LLM might generate incorrect table or column names if the schema context is too large or ambiguous.
+  - *Mitigation*: The system schema reader will pass exact column definitions, and the validation layer will verify table/column existence where possible.
+- **Heavy Queries**: Users might ask questions that translate to extremely expensive joins.
+  - *Mitigation*: Set tight timeouts and limit returned rows (e.g., append LIMIT 100 if no limit is specified).
 
 ### Open Questions
 - Which LLM model should we prioritize for the MVP? (Gemini or Claude or OpenAI).
 
 ## 15. Cross-Platform Contracts
-* **Shared Data Models:** Schema payload model, query generation payload model, database result payload model.
-* **Sync Model:** Frontend queries the backend via REST APIs.
-* **Identity Model:** None for MVP (open access control to database).
-* **Failure Expectations:** Graceful error messages when the database is unreachable, the LLM fails, or the SQL generated is invalid.
+* **Shared Data Models**: Schema payload model, query generation payload model, database result payload model.
+* **Sync Model**: Frontend queries the backend via REST APIs.
+* **Identity Model**: None for MVP (open access control to database).
+* **Failure Expectations**: Graceful error messages when the database is unreachable, the LLM fails, or the SQL generated is invalid.
 
 ## 16. Security And Compliance
-* **Access Rules (Read-Only Enforcement):** To guarantee that no database modifications can occur, the system implements a three-tier defense-in-depth security model:
-  1. **Database-Level Restrictions (Primary Defense):** The application will connect to the PostgreSQL database using a dedicated read-only database user (e.g., `sql_assistant_readonly`) that has *only* `SELECT` privileges on the target schema and tables. All write, update, insert, delete, or schema-altering privileges are explicitly revoked.
-  2. **Application-Level Abstract Syntax Tree (AST) Parsing:** Before sending any query to the database, the backend uses `sqlglot` to parse the generated SQL into an AST. If the AST contains any modification or data-definition nodes (e.g., `Insert`, `Update`, `Delete`, `Drop`, `Alter`, etc.), execution is blocked immediately and logged.
-  3. **Driver-Level Transaction Modes:** All queries are executed in explicit read-only transaction sessions (e.g., executing `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY` or running query sessions under a `READ ONLY` transaction block).
-* **Sensitive Data Handling:** Masking or omitting sensitive tables/columns from the schema mapping if they contain PII (e.g., user passwords, hashing keys).
-* **Legal Or Policy Requirements:** Database connections must use SSL/TLS.
+* **Access Rules (Read-Only Enforcement)**: To guarantee that no database modifications can occur, the system implements a four-tier defense-in-depth security model:
+  1. **Database-Level Restrictions (Primary Defense)**: The application will connect to the PostgreSQL database using a dedicated read-only database user (e.g., `sql_assistant_readonly`) that has *only* `SELECT` privileges on the target schema and tables. All write, update, insert, delete, or schema-altering privileges are explicitly revoked.
+  2. **Application-Level Abstract Syntax Tree (AST) Parsing**: Before sending any query to the database, the backend uses `sqlglot` to parse the generated SQL into an AST. If the AST contains any modification or data-definition nodes (e.g., `Insert`, `Update`, `Delete`, `Drop`, `Alter`, etc.), execution is blocked immediately and logged.
+  3. **AST Column and Table Verification**: All columns and tables referenced in the parsed SQL AST must match those in the schema reader cache. Any query referencing unmapped tables or column properties is rejected.
+  4. **Driver-Level Transaction Modes**: All queries are executed in explicit read-only transaction sessions (e.g., executing `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY` or running query sessions under a `READ ONLY` transaction block).
+* **Sensitive Data Handling**: Masking or omitting sensitive tables/columns from the schema mapping if they contain PII (e.g., user passwords, hashing keys) based on user permission roles.
+* **Legal Or Policy Requirements**: Database connections must use SSL/TLS.
 
 ## 17. Release And Rollout Notes
-* **Release Strategy:** Deploy FastAPI backend and React static build together, configured for a mock hotels/bookings dataset first.
-* **Rollback Strategy:** Revert to the previous git commit in the pipeline.
-* **Support Readiness:** Monitor API error logs and track query validation failures using standard logging.
+* **Release Strategy**: Deploy FastAPI backend and React static build together, configured for a mock hotels/bookings dataset first.
+* **Rollback Strategy**: Revert to the previous git commit in the pipeline.
+* **Support Readiness**: Monitor API error logs and track query validation failures using standard logging.

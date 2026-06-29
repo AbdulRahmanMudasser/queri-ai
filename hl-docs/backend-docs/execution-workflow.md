@@ -41,16 +41,17 @@ Every completed phase must satisfy all of the following:
 6. Evidence is logged in the linked phase file.
 
 ## 6. Current Active Phase
-* **Current Phase:** Phase 04 - Safe Query Execution & AI Explanation
-* **Status:** In Progress
+* **Current Phase:** Phase 07 - Few-Shot SQL Retrieval & Business Rules
+* **Status:** Ready
 * **Owner:** Abdul Rahman
-* **Linked Phase Doc:** [phase-04-safe-execution.md](./phase-04-safe-execution.md)
-* **Immediate Goal:** Execute validated SQL queries inside a read-only transaction with a 5-second timeout and 100-row limit, and explain results via Gemini.
+* **Linked Phase Doc:** [phase-07-fewshot-rules.md](./phase-07-fewshot-rules.md)
+* **Immediate Goal:** Implement dynamic few-shot retrieval from fewshot database files and formulate business rule prompts to enhance translation accuracy.
 * **Current Blockers:** None
-* **Next:** None (Backend MVP Complete)
+* **Next:** Phase 08 - Query History Memory & RBAC Masking
 
 ## 7. Ready Queue
-- None
+- [Phase 07 - Few-Shot SQL Retrieval & Business Rules](./phase-07-fewshot-rules.md)
+- [Phase 08 - Query History Memory & RBAC Masking](./phase-08-memory-rbac.md)
 
 ## 8. Phase Register
 | Phase | Name | Status | Priority | Owner | Depends On | Linked File | Target Window |
@@ -58,7 +59,11 @@ Every completed phase must satisfy all of the following:
 | 01 | Scaffolding & Core Configuration | Completed | High | Abdul Rahman | None | [phase-01-scaffolding.md](./phase-01-scaffolding.md) | 2026-06-28 |
 | 02 | Database Connection & Schema Reader | Completed | High | Abdul Rahman | Phase 01 | [phase-02-database-schema.md](./phase-02-database-schema.md) | 2026-06-28 |
 | 03 | SQL Generation & AST Validation Service | Completed | High | Abdul Rahman | Phase 02 | [phase-03-sql-generation.md](./phase-03-sql-generation.md) | 2026-06-29 |
-| 04 | Safe Query Execution & AI Explanation | In Progress | High | Abdul Rahman | Phase 03 | [phase-04-safe-execution.md](./phase-04-safe-execution.md) | 2026-06-29 |
+| 04 | Safe Query Execution & AI Explanation | Completed | High | Abdul Rahman | Phase 03 | [phase-04-safe-execution.md](./phase-04-safe-execution.md) | 2026-06-29 |
+| 05 | Structured JSON Output & Self-Correction | Completed | High | Abdul Rahman | Phase 04 | [phase-05-structured-correction.md](./phase-05-structured-correction.md) | 2026-06-29 |
+| 06 | Context Builder & Semantic Pruning (RAG) | Completed | High | Abdul Rahman | Phase 05 | [phase-06-schema-pruning.md](./phase-06-schema-pruning.md) | 2026-06-30 |
+| 07 | Few-Shot SQL Retrieval & Business Rules | Ready | High | Abdul Rahman | Phase 06 | [phase-07-fewshot-rules.md](./phase-07-fewshot-rules.md) | 2026-06-30 |
+| 08 | Query History Memory & RBAC Masking | Planned | High | Abdul Rahman | Phase 07 | [phase-08-memory-rbac.md](./phase-08-memory-rbac.md) | 2026-06-30 |
 
 ## 9. Blockers And Risks
 
@@ -83,7 +88,9 @@ Use this section to track material execution updates, not every minor edit.
 | 2026-06-28 | Phase 01 / Scaffolding & Core Configuration | Ready -> Completed | Poetry env, Pydantic Settings, structured logger, health endpoint, pre-commit hooks, and tests implemented. ruff, mypy, pytest all pass. | [Evidence](#11-execution-log) |
 | 2026-06-28 | Phase 02 / Database & Schema Reader | Planned -> Completed | Async engine, session dependency, metadata reader with caching, schema endpoint, and tests implemented. ruff, mypy, pytest all pass. | [Evidence](#11-execution-log) |
 | 2026-06-29 | Phase 03 / SQL Generation & AST Validation Service | Planned -> Completed | Translator with Gemini API, validator with SQLGlot safety rule analysis, generate endpoint, and tests implemented. ruff, mypy, pytest all pass. | [Evidence](#11-execution-log) |
-| 2026-06-29 | Phase 04 / Safe Query Execution & AI Explanation | Planned -> In Progress | Scoped implementation plan, setup tasks, and initiated development. | Phase 04 plan approved. |
+| 2026-06-29 | Phase 04 / Safe Query Execution & AI Explanation | In Progress -> Completed | Execute SQL inside read-only transaction with 5s timeout and 100-row limit, summarize via Gemini. | Pytest outputs passing. |
+| 2026-06-29 | Phase 05 / Structured JSON Output & Self-Correction | Planned -> Completed | Structured response schema config for Gemini, AST catalog checking for tables/columns, retry execution loop. | Pytest outputs passing. |
+| 2026-06-29 | Phase 06 / Context Builder & Semantic Pruning (RAG) | Ready -> Completed | Modular embeddings providers (fastembed & Gemini), custom similarity thresholds, dynamic schema context pruning, and token logging. | Pytest outputs passing. |
 
 ## 12. Workflow Rules
 - Every phase listed in the phase register must have a real linked file.
