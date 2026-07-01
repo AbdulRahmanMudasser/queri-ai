@@ -4,6 +4,8 @@ import logging
 import math
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.services.embeddings import EmbeddingsProvider
 
 logger = logging.getLogger(__name__)
@@ -46,7 +48,7 @@ async def prune_schema(
 
     current_hash = _get_schema_hash(schema)
     if _schema_hash != current_hash:
-        logger.info("Schema hash changed or cache cold. Generating new table embeddings.")
+        logger.info("Schema Hash Changed Or Cache Cold. Generating New Table Embeddings.")
         _table_embeddings_cache.clear()
         _schema_hash = current_hash
 
@@ -67,7 +69,7 @@ async def prune_schema(
             try:
                 score = cosine_similarity(question_emb, table_emb)
             except ValueError:
-                logger.warning("Embedding dimension mismatch in cache. Regenerating embeddings.")
+                logger.warning("Embedding Dimension Mismatch In Cache. Regenerating Embeddings.")
                 _table_embeddings_cache.clear()
                 # Regenerate all table embeddings
                 for t in schema:
@@ -84,9 +86,48 @@ async def prune_schema(
     # Filter tables: threshold >= 0.35, fallback to top-3
     pruned = [table for score, table in scored_tables if score >= 0.35]
     if not pruned:
-        logger.info("No tables crossed the 0.35 threshold. Falling back to top-3.")
+        logger.info("No Tables Crossed The 0.35 Threshold. Falling Back To Top-3.")
         pruned = [table for score, table in scored_tables[:3]]
 
     pruned_names = {t["name"] for t in pruned}
     # Maintain original order of tables
     return [table for table in schema if table["name"] in pruned_names]
+
+
+async def get_few_shot_examples(
+    question: str,
+    db: AsyncSession,
+    provider: EmbeddingsProvider,
+    top_k: int = 2,
+) -> list[dict[str, str]]:
+    from sqlalchemy import select
+
+    from app.db.models import FewShotExample
+
+    result = await db.execute(select(FewShotExample))
+    rows = result.scalars().all()
+    if not rows:
+        return []
+
+    question_emb = await provider.get_embedding(question)
+    scored: list[tuple[float, FewShotExample]] = []
+    for row in rows:
+        try:
+            score = cosine_similarity(question_emb, list(row.question_vector))
+        except ValueError:
+            logger.warning("Vector Dimension Mismatch For Example ID=%d, Skipping.", row.id)
+            continue
+        scored.append((score, row))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [{"question": r.question, "sql": r.sql_query} for _, r in scored[:top_k]]
+
+
+async def get_business_rules(db: AsyncSession) -> list[str]:
+    from sqlalchemy import select
+
+    from app.db.models import BusinessRule
+
+    result = await db.execute(select(BusinessRule))
+    rows = result.scalars().all()
+    return [row.rule_value for row in rows]
