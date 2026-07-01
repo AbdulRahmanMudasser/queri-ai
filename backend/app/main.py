@@ -9,8 +9,11 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logger import setup_logging
+from app.db.models import Base
 from app.db.reader import load_schema
-from app.db.session import AsyncSessionLocal
+from app.db.seeder import seed_database
+from app.db.session import AsyncSessionLocal, engine
+from app.services.embeddings import get_embeddings_provider
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -18,15 +21,35 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001
-    logger.info("Starting up Queri.ai backend", extra={"env": settings.ENV})
+    logger.info("Starting Up Queri.ai Backend", extra={"env": settings.ENV})
+
+    # Step 1: Create ORM tables (idempotent — CREATE TABLE IF NOT EXISTS)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database Tables Verified/Created.")
+    except Exception:
+        logger.warning(
+            "Could not Create Database Tables At Startup — DB May Be Unavailable", exc_info=True
+        )
+
+    # Step 2: Seed database and load schema
     async with AsyncSessionLocal() as db:
         try:
-            tables = await load_schema(db)
-            logger.info("Schema loaded: %d tables", len(tables))
+            provider = get_embeddings_provider()
+            await seed_database(db, provider)
         except Exception:
-            logger.warning("Could not load schema at startup — DB may be unavailable")
+            logger.warning("Database Seeding Failed At Startup", exc_info=True)
+
+        try:
+            tables = await load_schema(db)
+            logger.info("Schema Loaded: %d Tables", len(tables))
+        except Exception:
+            logger.warning(
+                "Could not Load Schema At Startup — DB May Be Unavailable", exc_info=True
+            )
     yield
-    logger.info("Shutting down Queri.ai backend")
+    logger.info("Shutting Down Queri.ai Backend")
 
 
 app = FastAPI(
