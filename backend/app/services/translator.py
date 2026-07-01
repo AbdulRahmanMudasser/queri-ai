@@ -33,12 +33,27 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _build_prompt(question: str, schema_md: str) -> str:
+def _build_prompt(
+    question: str,
+    schema_md: str,
+    few_shot_examples: list[dict[str, str]] | None = None,
+    business_rules: list[str] | None = None,
+) -> str:
+    rules_section = ""
+    if business_rules:
+        rules_lines = "\n".join(f"- {r}" for r in business_rules)
+        rules_section = f"\n## Business Rules\n{rules_lines}\n"
+
+    fewshot_section = ""
+    if few_shot_examples:
+        examples = "\n\n".join(f"Q: {ex['question']}\nSQL: {ex['sql']}" for ex in few_shot_examples)
+        fewshot_section = f"\n## Similar Query Examples\n{examples}\n"
+
     return f"""{_SYSTEM_PROMPT}
 
 Database schema:
 {schema_md}
-
+{rules_section}{fewshot_section}
 Rules:
 1. Generate ONLY SELECT statements (or WITH ... SELECT for CTEs)
 2. NEVER generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, GRANT, REVOKE, or CREATE
@@ -56,14 +71,26 @@ def _build_correction_prompt(
     schema_md: str,
     previous_sql: str,
     error_message: str,
+    few_shot_examples: list[dict[str, str]] | None = None,
+    business_rules: list[str] | None = None,
 ) -> str:
+    rules_section = ""
+    if business_rules:
+        rules_lines = "\n".join(f"- {r}" for r in business_rules)
+        rules_section = f"\n## Business Rules\n{rules_lines}\n"
+
+    fewshot_section = ""
+    if few_shot_examples:
+        examples = "\n\n".join(f"Q: {ex['question']}\nSQL: {ex['sql']}" for ex in few_shot_examples)
+        fewshot_section = f"\n## Similar Query Examples\n{examples}\n"
+
     return f"""You are a PostgreSQL expert assistant.
 The previous SQL query you generated for the user's question failed validation or execution.
 Correct the query and return a valid PostgreSQL query.
 
 Database schema:
 {schema_md}
-
+{rules_section}{fewshot_section}
 User's Original Question: {question}
 Failed SQL Query: {previous_sql}
 Error Message: {error_message}
@@ -84,26 +111,40 @@ async def translate(
     schema: list[dict[str, Any]],
     previous_sql: str | None = None,
     error_message: str | None = None,
+    few_shot_examples: list[dict[str, str]] | None = None,
+    business_rules: list[str] | None = None,
 ) -> dict[str, Any]:
     schema_md = _format_schema(schema)
     if previous_sql and error_message:
-        prompt = _build_correction_prompt(question, schema_md, previous_sql, error_message)
+        prompt = _build_correction_prompt(
+            question,
+            schema_md,
+            previous_sql,
+            error_message,
+            few_shot_examples=few_shot_examples,
+            business_rules=business_rules,
+        )
     else:
-        prompt = _build_prompt(question, schema_md)
+        prompt = _build_prompt(
+            question,
+            schema_md,
+            few_shot_examples=few_shot_examples,
+            business_rules=business_rules,
+        )
 
     logger.info(
-        "Translation prompt constructed: %d tables included in schema context, "
-        "total prompt length: %d characters",
+        "Translation Prompt Constructed: %d Tables Included In Schema Context, "
+        "Total Prompt Length: %d Characters",
         len(schema),
         len(prompt),
     )
-    logger.info("Sending prompt to Gemini (question=%s)", question[:80])
+    logger.info("Sending Prompt To Gemini (Question=%s)", question[:80])
     response = await _model.generate_content_async(
         prompt,
         generation_config={  # type: ignore[arg-type]
             "response_mime_type": "application/json",
             "response_schema": TranslationResponse,
-        }
+        },
     )
     if response.text is None:
         raise RuntimeError("Gemini blocked the response (safety filter)")
@@ -111,12 +152,11 @@ async def translate(
     try:
         result = cast(dict[str, Any], json.loads(response.text))
     except Exception as exc:
-        logger.error("Failed to parse Gemini structured JSON: %s", response.text)
+        logger.error("Failed To Parse Gemini Structured JSON: %s", response.text)
         raise RuntimeError("Gemini returned invalid JSON structure") from exc
 
-    logger.info("Gemini returned structured SQL: %s", result.get("sql", "")[:200])
+    logger.info("Gemini Returned Structured SQL: %s", result.get("sql", "")[:200])
     return result
-
 
 
 _EXPLAIN_SYSTEM_PROMPT = (
@@ -155,9 +195,8 @@ async def explain(question: str, sql: str, columns: list[str], rows: list[list[A
     # Cap rows to 100 to prevent prompt size blowup
     capped_rows = rows[:100]
     prompt = _build_explain_prompt(question, sql, columns, capped_rows)
-    logger.info("Sending explain prompt to Gemini (question=%s)", question[:80])
+    logger.info("Sending Explain Prompt To Gemini (Question=%s)", question[:80])
     response = await _model.generate_content_async(prompt)
     if response.text is None:
         raise RuntimeError("Gemini blocked the response (safety filter)")
     return str(response.text).strip()
-
