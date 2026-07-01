@@ -46,7 +46,7 @@ async def test_get_few_shot_examples_returns_top_k() -> None:
         question_vector=[0.0, 0.0, 1.0],
     )
 
-    mock_result.scalars.return_value.all.return_value = [ex1, ex2, ex3]
+    mock_result.scalars.return_value.all.return_value = [ex1, ex2]
     db.execute.return_value = mock_result
 
     provider = DummyProvider()
