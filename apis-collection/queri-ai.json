@@ -1,0 +1,191 @@
+{
+  "info": {
+    "name": "Queri.ai API Collection",
+    "description": "Official API contract and documentation for the Queri.ai backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Checks if the Queri.ai API is running and returns the current environment mode."
+          },
+          "response": [
+            {
+              "name": "Healthy",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": \"healthy\",\n  \"environment\": \"dev\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Schema",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/schema",
+              "host": ["{{baseUrl}}"],
+              "path": ["schema"]
+            },
+            "description": "Retrieves the cached database schema (tables and columns) currently loaded by the application for RAG operations."
+          },
+          "response": [
+            {
+              "name": "Schema Retrieved",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"tables\": {\n    \"users\": {\n      \"columns\": [\"id\", \"name\", \"created_at\"]\n    }\n  }\n}"
+            },
+            {
+              "name": "Schema Not Loaded",
+              "status": "Service Unavailable",
+              "code": 503,
+              "body": "{\n  \"detail\": \"Schema not yet loaded\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Query",
+      "item": [
+        {
+          "name": "Generate Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"question\": \"How many users signed up last week?\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/query/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["query", "generate"]
+            },
+            "description": "Translates a natural language question into a PostgreSQL query. It uses Gemini LLM, prunes the schema context via embeddings, checks against AST safety rules, and performs a database dry-run."
+          },
+          "response": [
+            {
+              "name": "Query Generated Successfully",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"sql\": \"SELECT count(*) FROM users WHERE created_at >= NOW() - INTERVAL '1 week';\",\n  \"reasoning\": \"I identified the 'users' table and used the 'created_at' column to filter for signups from the past week.\"\n}"
+            },
+            {
+              "name": "Self-Correction Failed",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"detail\": \"Query generation and correction failed: syntax error at or near 'SELECT'\"\n}"
+            },
+            {
+              "name": "Service Unavailable",
+              "status": "Service Unavailable",
+              "code": 503,
+              "body": "{\n  \"detail\": \"Translation service currently unavailable\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Execute Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"sql\": \"SELECT count(*) FROM users WHERE created_at >= NOW() - INTERVAL '1 week';\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/query/execute",
+              "host": ["{{baseUrl}}"],
+              "path": ["query", "execute"]
+            },
+            "description": "Executes a validated SQL query against the database. It enforces read-only transactions, a strict 5-second statement timeout, and an AST-level row limit of 100."
+          },
+          "response": [
+            {
+              "name": "Execution Successful",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"columns\": [\"count\"],\n  \"rows\": [\n    [42]\n  ]\n}"
+            },
+            {
+              "name": "Validation or DB Error",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"detail\": \"Database execution error: relation 'users' does not exist\"\n}"
+            },
+            {
+              "name": "Query Timed Out",
+              "status": "Request Timeout",
+              "code": 408,
+              "body": "{\n  \"detail\": \"Query execution timed out (5.0s limit)\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Explain Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"question\": \"How many users signed up last week?\",\n    \"sql\": \"SELECT count(*) FROM users;\",\n    \"columns\": [\"count\"],\n    \"rows\": [[42]]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/query/explain",
+              "host": ["{{baseUrl}}"],
+              "path": ["query", "explain"]
+            },
+            "description": "Takes the raw database results and the original question, and uses the LLM to generate a plain-English, conversational explanation of the findings."
+          },
+          "response": [
+            {
+              "name": "Explanation Generated",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"explanation\": \"Based on the database, exactly 42 users have signed up in the last week.\"\n}"
+            },
+            {
+              "name": "Service Unavailable",
+              "status": "Service Unavailable",
+              "code": 503,
+              "body": "{\n  \"detail\": \"Explanation service currently unavailable\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api/v1"
+    }
+  ]
+}
