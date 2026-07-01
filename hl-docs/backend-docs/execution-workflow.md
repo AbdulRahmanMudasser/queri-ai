@@ -47,7 +47,7 @@ Every completed phase must satisfy all of the following:
 * **Linked Phase Doc:** [phase-08-memory-rbac.md](./phase-08-memory-rbac.md)
 * **Immediate Goal:** Implement database memory context for multi-turn conversations and RBAC column/table masking based on user roles.
 * **Current Blockers:** None
-* **Next:** Phase 09 - Optimization, Performance & Caching
+* **Next:** Phase 09 - Performance and Distributed Caching
 
 ## 7. Ready Queue
 - [Phase 08 - Query History Memory & RBAC Masking](./phase-08-memory-rbac.md) ← **Active**
@@ -64,6 +64,8 @@ Every completed phase must satisfy all of the following:
 | 07 | ORM Models, DB Tables & Startup Seeder | Completed | High | Abdul Rahman | Phase 06 | [phase-07-fewshot-rules.md](./phase-07-fewshot-rules.md) | 2026-07-01 |
 | 07b | Few-Shot Retrieval & Prompt Integration | Completed | High | Abdul Rahman | Phase 07 | [phase-07b-fewshot-integration.md](./phase-07b-fewshot-integration.md) | 2026-07-01 |
 | 08 | Query History Memory & RBAC Masking | Ready | High | Abdul Rahman | Phase 07b | [phase-08-memory-rbac.md](./phase-08-memory-rbac.md) | 2026-07-01 |
+| 09 | Performance and Distributed Caching | Planned | High | Abdul Rahman | Phase 08 | [phase-09-performance-and-caching.md](./phase-09-performance-and-caching.md) | July 2026 |
+| 10 | System Resilience & Config Standardization | Planned | High | Abdul Rahman | Phase 09 | [phase-10-system-resilience.md](./phase-10-system-resilience.md) | July 2026 |
 
 ## 9. Blockers And Risks
 

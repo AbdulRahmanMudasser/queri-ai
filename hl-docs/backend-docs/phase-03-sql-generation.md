@@ -18,7 +18,7 @@ This document controls execution for translating user questions into SQL via Gem
 ## 4. Ownership And Delivery Notes
 * **Owner:** Abdul Rahman
 * **Priority:** High
-* **Target Window:** [YYYY-MM-DD to YYYY-MM-DD]
+* **Target Window:** June - July 2026
 * **Related PRD Section:** Feature 3 (SQL Generation), Feature 4 (SQL Validation), and Section 16 (Security)
 * **Related Build Plan Section:** Section 5 (Lifespan & Connections) and Section 8 (Security)
 

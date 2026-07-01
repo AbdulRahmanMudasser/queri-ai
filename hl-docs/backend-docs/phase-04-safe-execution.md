@@ -18,7 +18,7 @@ This document controls execution for running validated SQL queries securely on t
 ## 4. Ownership And Delivery Notes
 * **Owner:** Abdul Rahman
 * **Priority:** High
-* **Target Window:** [YYYY-MM-DD to YYYY-MM-DD]
+* **Target Window:** June - July 2026
 * **Related PRD Section:** Feature 5 (Query Execution), Feature 6 (Result Visualization), Feature 7 (AI Explanation), and Section 16 (Security)
 * **Related Build Plan Section:** Section 5 (Lifespan & Connections) and Section 7 (Error Handling)
 

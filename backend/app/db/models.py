@@ -1,5 +1,5 @@
-from sqlalchemy import Float, Integer, String
-from sqlalchemy.dialects.postgresql import ARRAY
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -22,4 +22,4 @@ class FewShotExample(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     question: Mapped[str] = mapped_column(String, nullable=False)
     sql_query: Mapped[str] = mapped_column(String, nullable=False)
-    question_vector: Mapped[list[float]] = mapped_column(ARRAY(Float), nullable=False)
+    question_vector: Mapped[list[float]] = mapped_column(Vector(), nullable=False)

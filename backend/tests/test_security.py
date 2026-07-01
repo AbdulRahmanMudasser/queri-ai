@@ -107,11 +107,16 @@ class TestValidateSql:
             validate_sql("SELECT * FROM non_existent", schema=MOCK_SCHEMA)
 
     def test_schema_validation_invalid_column(self) -> None:
-        with pytest.raises(ValueError, match="Column 'hotel_mail' does not exist"):
+        with pytest.raises(ValueError, match="Query validation failed"):
             validate_sql("SELECT hotel_mail FROM hotels", schema=MOCK_SCHEMA)
 
     def test_schema_validation_cte_valid(self) -> None:
         sql = "WITH recent AS (SELECT name AS hotel_name FROM hotels) SELECT hotel_name FROM recent"
+        result = validate_sql(sql, schema=MOCK_SCHEMA)
+        assert "SELECT" in result
+
+    def test_schema_validation_nested_alias_conflict(self) -> None:
+        sql = "SELECT t.id FROM hotels t WHERE t.id IN (SELECT t.hotel_id FROM bookings t)"
         result = validate_sql(sql, schema=MOCK_SCHEMA)
         assert "SELECT" in result
 

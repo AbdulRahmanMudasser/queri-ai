@@ -64,8 +64,8 @@ async def generate_query(
     try:
         pruned_tables = await prune_schema(body.question, tables, provider)
     except Exception as exc:
-        logger.warning("Schema Pruning Failed, Falling Back To Full Schema Catalog: %s", exc)
-        pruned_tables = tables
+        logger.warning("Schema Pruning Failed, Falling Back To Top 10 Tables: %s", exc)
+        pruned_tables = tables[:10] if tables else []
 
     try:
         few_shot = await get_few_shot_examples(body.question, db, provider)

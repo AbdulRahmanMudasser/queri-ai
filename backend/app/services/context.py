@@ -11,8 +11,7 @@ from app.services.embeddings import EmbeddingsProvider
 logger = logging.getLogger(__name__)
 
 # Global caches for schema embeddings
-_table_embeddings_cache: dict[str, list[float]] = {}
-_schema_hash: str | None = None
+_table_embeddings_cache: dict[str, dict[str, Any]] = {}
 
 
 def cosine_similarity(v1: list[float], v2: list[float]) -> float:
@@ -41,21 +40,10 @@ async def prune_schema(
     schema: list[dict[str, Any]],
     provider: EmbeddingsProvider,
 ) -> list[dict[str, Any]]:
-    global _table_embeddings_cache, _schema_hash
+    global _table_embeddings_cache
 
     if not schema:
         return []
-
-    current_hash = _get_schema_hash(schema)
-    if _schema_hash != current_hash:
-        logger.info("Schema Hash Changed Or Cache Cold. Generating New Table Embeddings.")
-        _table_embeddings_cache.clear()
-        _schema_hash = current_hash
-
-        for table in schema:
-            desc = _get_table_description(table)
-            emb = await provider.get_embedding(desc)
-            _table_embeddings_cache[table["name"]] = emb
 
     # Generate question embedding
     question_emb = await provider.get_embedding(question)
@@ -64,21 +52,32 @@ async def prune_schema(
     scored_tables = []
     for table in schema:
         table_name = table["name"]
-        table_emb = _table_embeddings_cache.get(table_name)
-        if table_emb is not None:
-            try:
-                score = cosine_similarity(question_emb, table_emb)
-            except ValueError:
-                logger.warning("Embedding Dimension Mismatch In Cache. Regenerating Embeddings.")
-                _table_embeddings_cache.clear()
-                # Regenerate all table embeddings
-                for t in schema:
-                    desc = _get_table_description(t)
-                    emb = await provider.get_embedding(desc)
-                    _table_embeddings_cache[t["name"]] = emb
-                table_emb = _table_embeddings_cache[table_name]
-                score = cosine_similarity(question_emb, table_emb)
-            scored_tables.append((score, table))
+        
+        # calculate table hash based only on this table's structure
+        table_serialized = json.dumps(table, sort_keys=True)
+        table_hash = hashlib.sha256(table_serialized.encode("utf-8")).hexdigest()
+        
+        cache_entry = _table_embeddings_cache.get(table_name)
+        if cache_entry is None or cache_entry["hash"] != table_hash:
+            logger.info("Table %s Hash Changed Or Cache Cold. Generating New Embedding.", table_name)
+            desc = _get_table_description(table)
+            emb = await provider.get_embedding(desc)
+            _table_embeddings_cache[table_name] = {"hash": table_hash, "embedding": emb}
+            table_emb = emb
+        else:
+            table_emb = cache_entry["embedding"]
+
+        try:
+            score = cosine_similarity(question_emb, table_emb)
+        except ValueError:
+            logger.warning("Embedding Dimension Mismatch In Cache. Regenerating Embedding for %s.", table_name)
+            desc = _get_table_description(table)
+            emb = await provider.get_embedding(desc)
+            _table_embeddings_cache[table_name] = {"hash": table_hash, "embedding": emb}
+            table_emb = emb
+            score = cosine_similarity(question_emb, table_emb)
+            
+        scored_tables.append((score, table))
 
     # Sort scored tables descending by score
     scored_tables.sort(key=lambda x: x[0], reverse=True)
@@ -104,23 +103,16 @@ async def get_few_shot_examples(
 
     from app.db.models import FewShotExample
 
-    result = await db.execute(select(FewShotExample))
-    rows = result.scalars().all()
-    if not rows:
-        return []
-
     question_emb = await provider.get_embedding(question)
-    scored: list[tuple[float, FewShotExample]] = []
-    for row in rows:
-        try:
-            score = cosine_similarity(question_emb, list(row.question_vector))
-        except ValueError:
-            logger.warning("Vector Dimension Mismatch For Example ID=%d, Skipping.", row.id)
-            continue
-        scored.append((score, row))
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [{"question": r.question, "sql": r.sql_query} for _, r in scored[:top_k]]
+    result = await db.execute(
+        select(FewShotExample)
+        .order_by(FewShotExample.question_vector.cosine_distance(question_emb))
+        .limit(top_k)
+    )
+    rows = result.scalars().all()
+
+    return [{"question": r.question, "sql": r.sql_query} for r in rows]
 
 
 async def get_business_rules(db: AsyncSession) -> list[str]:

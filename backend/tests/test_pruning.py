@@ -51,8 +51,8 @@ def test_cosine_similarity_edge_cases() -> None:
 @pytest.mark.asyncio
 async def test_prune_schema_threshold() -> None:
     # Clear global cache to isolate test run
+    # Clear global cache to isolate test run
     app.services.context._table_embeddings_cache.clear()
-    app.services.context._schema_hash = None
 
     class FixedEmbeddingsProvider(EmbeddingsProvider):
         async def get_embedding(self, text: str) -> list[float]:
@@ -83,8 +83,8 @@ async def test_prune_schema_threshold() -> None:
 @pytest.mark.asyncio
 async def test_prune_schema_fallback() -> None:
     # Clear global cache to isolate test run
+    # Clear global cache to isolate test run
     app.services.context._table_embeddings_cache.clear()
-    app.services.context._schema_hash = None
 
     class FixedEmbeddingsProvider(EmbeddingsProvider):
         async def get_embedding(self, text: str) -> list[float]:
@@ -121,8 +121,8 @@ def test_generate_endpoint_pruning_integration(
     _ = mock_db_session
 
     # Clear global cache to isolate test run
+    # Clear global cache to isolate test run
     app.services.context._table_embeddings_cache.clear()
-    app.services.context._schema_hash = None
 
     mock_get_cached_schema.return_value = MOCK_SCHEMA
     mock_translate.return_value = {

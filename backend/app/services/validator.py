@@ -45,60 +45,20 @@ def validate_sql(sql: str, schema: list[dict[str, Any]] | None = None) -> str:
 
     # Table and Column validation against cached schema
     if schema is not None:
-        db_schema = {table["name"]: {col["name"] for col in table["columns"]} for table in schema}
+        db_schema = {table["name"]: {col["name"]: col.get("type", "UNKNOWN") for col in table["columns"]} for table in schema}
+
         ctes = {cte.alias for cte in parsed.find_all(exp.CTE) if cte.alias}
-
-        alias_to_table = {}
-        referenced_tables = set()
-
-        # 1. Collect all referenced tables and map their aliases
         for table_node in parsed.find_all(exp.Table):
-            table_name = table_node.name
-            if table_name in ctes:
-                continue
+            if table_node.name not in db_schema and table_node.name not in ctes:
+                raise ValueError(f"Table '{table_node.name}' does not exist in database schema")
 
-            if table_name not in db_schema:
-                raise ValueError(f"Table '{table_name}' does not exist in database schema")
+        try:
+            from sqlglot.optimizer.qualify import qualify
+            parsed = qualify(parsed, schema=db_schema, dialect="postgres")
+        except sqlglot.errors.OptimizeError as e:
+            raise ValueError(f"Query validation failed: {e}") from e
 
-            referenced_tables.add(table_name)
-            alias_to_table[table_name] = table_name
-            if table_node.alias:
-                alias_to_table[table_node.alias] = table_name
-
-        # 2. Collect all select aliases in the query to allow referencing them
-        select_aliases = {
-            alias_node.alias for alias_node in parsed.find_all(exp.Alias) if alias_node.alias
-        }
-
-        # 3. Verify all column nodes
-        for column_node in parsed.find_all(exp.Column):
-            col_name = column_node.name
-            col_table = column_node.table
-
-            # Skip wildcards (e.g. table.*)
-            if col_name == "*":
-                continue
-
-            if col_table:
-                if col_table in ctes:
-                    continue
-
-                actual_table = alias_to_table.get(col_table)
-                if actual_table:
-                    if col_name not in db_schema[actual_table]:
-                        raise ValueError(
-                            f"Column '{col_name}' does not exist in table '{actual_table}'"
-                        )
-                else:
-                    # Ignore subquery aliases or unrecognized table prefixes
-                    pass
-            else:
-                if referenced_tables:
-                    in_any_table = any(col_name in db_schema[t] for t in referenced_tables)
-                    if not in_any_table and col_name not in select_aliases:
-                        raise ValueError(f"Column '{col_name}' does not exist in referenced tables")
-
-    return sqlglot.transpile(sql, read="postgres", write="postgres", pretty=True)[0]
+    return sqlglot.transpile(parsed.sql(dialect="postgres"), read="postgres", write="postgres", pretty=True)[0]
 
 
 def limit_sql(sql: str, max_limit: int = 100) -> str:

@@ -1,25 +1,27 @@
 # Queri.ai
 
-Queri.ai is an intelligent, secure, and cost-optimized natural language to SQL translation and execution engine. By combining the power of Google Gemini with local semantic schema pruning (RAG), AST-based security gates, and transaction-safe database dry-runs, Queri.ai allows users to query databases in plain English without risking schema modifications or API quota exhaustion.
+Queri.ai is a backend API designed to translate natural language questions into safe, read-only PostgreSQL queries. It utilizes Google Gemini for LLM translation, FastEmbed for local RAG-based schema pruning, and SQLGlot for strict AST-level query validation.
 
 ---
 
 ## Key Features
 
 * **Natural Language to SQL:** Generates PostgreSQL queries from natural English questions using `gemini-2.5-flash-lite`.
-* **Cost-Optimized Schema Pruning (RAG):** Uses local CPU-based embeddings (`fastembed` with ONNX models) or Gemini embeddings to prune the database schema context, sending only mathematically relevant tables to the LLM.
-* **AST Safety & Security Validation:** Walks the SQL Abstract Syntax Tree (AST) using `SQLGlot` to detect and block unsafe DML/DDL operations (e.g. `DROP`, `DELETE`, `UPDATE`, `ALTER`) before execution.
-* **Safe Dry-Run Execution:** Runs an `EXPLAIN` query inside a strict read-only transaction with a 2-second statement timeout to verify syntax and catalog safety.
-* **AI Results Explanation:** Translates raw tabular rows and columns back into clear, concise conversational English summaries.
-* **Single-Attempt Self-Correction:** Automatically catches database syntax or AST validation failures and triggers a single feedback-driven self-correction loop to repair the query on the fly.
+* **Schema Pruning via RAG:** Uses local CPU embeddings (`fastembed`) to prune the database schema context based on cosine similarity, passing only relevant tables to the LLM. 
+* **Few-Shot Examples & Business Rules:** Retrieves similar past query examples using `pgvector` and injects them alongside static business rules into the LLM context to improve accuracy.
+* **AST Safety Validation:** Walks the SQL Abstract Syntax Tree (AST) using `SQLGlot` to aggressively block unsafe DML/DDL operations (e.g., `INSERT`, `DROP`, `DELETE`, `UPDATE`, `ALTER`) and validates all table/column names against the actual database schema.
+* **Query Limit Enforcement:** Automatically parses and overrides the `LIMIT` clause to a maximum of 100 rows to prevent massive data pulls.
+* **Single-Attempt Self-Correction:** Detects database syntax or validation errors and automatically prompts the LLM once with the error message to attempt a self-correction.
+* **AI Results Explanation:** Translates the raw tabular SQL execution results back into concise conversational English.
 
 ---
 
 ## Technology Stack
 
-* **Backend Framework:** FastAPI (Asynchronous Python 3.12+)
-* **Database Driver:** SQLAlchemy 2.0 + `asyncpg` (PostgreSQL)
-* **SQL Parsing & Transpilation:** SQLGlot
-* **Vector Embeddings (RAG):** FastEmbed (Local ONNX CPU) / Gemini Embeddings
-* **LLM Engine:** Google Generative AI SDK (Gemini Pro / Flash)
+* **Backend Framework:** FastAPI (Asynchronous Python 3.11+)
+* **Database & ORM:** SQLAlchemy 2.0 + `asyncpg` (PostgreSQL)
+* **Vector Extension:** `pgvector`
+* **SQL Parsing & Validation:** SQLGlot
+* **Vector Embeddings (RAG):** FastEmbed (Local ONNX CPU)
+* **LLM Engine:** Google Generative AI SDK
 * **Dependency Manager:** Poetry
