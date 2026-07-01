@@ -26,11 +26,11 @@ This document controls execution for Phase 07, focusing exclusively on the **dat
 
 ## 5. Infrastructure & Environment Requirements
 * **Environment Variables:** `DATABASE_URL`, `GEMINI_API_KEY`, `EMBEDDING_PROVIDER`.
-* **Database/Index Changes:**
+* **Database Target:** `queri` database (public schema).
+* **New Tables:**
+  - Create table `few_shot_examples` with columns: `id` (PK), `question` (str), `sql_query` (str), `question_vector` (PostgreSQL `vector`).
   - Create table `business_rules` with columns: `id` (PK), `rule_name` (str), `rule_description` (str), `rule_value` (str).
-  - Create table `few_shot_examples` with columns: `id` (PK), `question` (str), `sql_query` (str), `question_vector` (PostgreSQL `ARRAY(Float)`).
-  - Tables are created via `Base.metadata.create_all()` in the FastAPI lifespan — not Alembic.
-* **No new dependencies required:** SQLAlchemy 2.x `Mapped`/`mapped_column` ORM and `postgresql.ARRAY` are already available via the existing `sqlalchemy = "^2.0.0"` and `asyncpg = "^0.30.0"` dependencies.
+* **Dependencies required:** SQLAlchemy 2.x `Mapped`/`mapped_column` ORM and `pgvector` are required via existing dependencies.
 
 ## 6. API & Data Contract Specifications
 * No new API endpoints in this phase.
@@ -72,12 +72,11 @@ This document controls execution for Phase 07, focusing exclusively on the **dat
 * [NEW] `backend/app/db/models.py`:
   - [ ] Define `Base = DeclarativeBase()`.
   - [ ] Define `BusinessRule(Base)` model with `Mapped` typed columns: `id` (Integer PK autoincrement), `rule_name` (String), `rule_description` (String), `rule_value` (String).
-  - [ ] Define `FewShotExample(Base)` model: `id` (Integer PK autoincrement), `question` (String), `sql_query` (String), `question_vector` must use an **explicit** `mapped_column(ARRAY(Float), nullable=False)` — do NOT rely on type inference. SQLAlchemy 2.x cannot infer `ARRAY(Float)` from `Mapped[list[float]]` automatically and mypy strict will reject it without the explicit annotation.
-  - [ ] Example:
+  - [ ] Define `FewShotExample(Base)` model: `id` (Integer PK autoincrement), `question` (String), `sql_query` (String), `question_vector` must use an **explicit** `mapped_column(Vector(1536), nullable=False)` for `pgvector` compatibility.
+  - [ ] Example definition:
     ```python
-    from sqlalchemy.dialects.postgresql import ARRAY
-    from sqlalchemy import Float
-    question_vector: Mapped[list[float]] = mapped_column(ARRAY(Float), nullable=False)
+    from pgvector.sqlalchemy import Vector
+    question_vector: Mapped[list[float]] = mapped_column(Vector(1536), nullable=False)
     ```
 
 * [NEW] `backend/app/db/seeder.py`:
