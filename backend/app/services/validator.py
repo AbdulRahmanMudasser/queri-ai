@@ -67,9 +67,7 @@ def validate_sql(sql: str, schema: list[dict[str, Any]] | None = None) -> str:
 
         # 2. Collect all select aliases in the query to allow referencing them
         select_aliases = {
-            alias_node.alias
-            for alias_node in parsed.find_all(exp.Alias)
-            if alias_node.alias
+            alias_node.alias for alias_node in parsed.find_all(exp.Alias) if alias_node.alias
         }
 
         # 3. Verify all column nodes
@@ -101,7 +99,6 @@ def validate_sql(sql: str, schema: list[dict[str, Any]] | None = None) -> str:
                         raise ValueError(f"Column '{col_name}' does not exist in referenced tables")
 
     return sqlglot.transpile(sql, read="postgres", write="postgres", pretty=True)[0]
-
 
 
 def limit_sql(sql: str, max_limit: int = 100) -> str:
