@@ -18,7 +18,7 @@ This document controls execution for establishing connection pools to PostgreSQL
 ## 4. Ownership And Delivery Notes
 * **Owner:** Abdul Rahman
 * **Priority:** High
-* **Target Window:** [YYYY-MM-DD to YYYY-MM-DD]
+* **Target Window:** June - July 2026
 * **Related PRD Section:** Feature 1 (Database Schema Reader) and Section 16 (Security)
 * **Related Build Plan Section:** Section 5 (Lifespan & Connections) and Section 6 (Domain Models)
 

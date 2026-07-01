@@ -18,7 +18,10 @@ This document is the technical source of truth for the Backend API layer of Quer
 * **Web Server:** Uvicorn (ASGI web server)
 * **SQL Parsing & Validation:** SQLGlot (for parsing and inspecting SQL ASTs)
 * **Database Client:** SQLAlchemy (with `asyncpg` for asynchronous PostgreSQL access)
+* **Vector Database:** `pgvector` (for vector embeddings storage in PostgreSQL)
 * **Data Validation & Settings:** Pydantic v2 & `pydantic-settings`
+* **Caching & State:** Redis (for distributed schema and context caching)
+* **Templating:** Jinja2 (for prompt construction)
 * **Semantic Embeddings:** `fastembed` (for local, CPU-bound ONNX embedding generation)
 * **LLM SDK:** `google-generativeai` (Gemini API SDK for translation and embeddings)
 * **Testing Stack:** Pytest, pytest-asyncio, HTTPX (for client testing)
@@ -92,7 +95,7 @@ backend/
 ---
 
 ## 5. Lifespan and Connection Management
-* **Lifespan Manager:** The application uses FastAPI's `lifespan` context manager. On startup, it establishes the database engine connection pool and caches the database metadata. On shutdown, it closes all active pools to avoid connection leaks.
+* **Lifespan Manager:** The application uses FastAPI's `lifespan` context manager. On startup, it establishes the database engine connection pool and caches the database metadata in Redis. **Fail-Fast Policy:** If the database is unreachable or schema loading fails, the application will intentionally crash during startup to allow orchestration layers to restart it, preventing zombie states. On shutdown, it closes all active pools to avoid connection leaks.
 * **Dependency Injection:** Database sessions are fetched per request using a dependency helper injected into routers:
   ```python
   async def get_db():
@@ -105,7 +108,7 @@ backend/
 
 ## 6. Data Flow And State Strategy
 * **Primary Data Retrieval Model:** Asynchronous request-driven database queries.
-* **Schema Reader Strategy:** Schema is queried from the PostgreSQL `information_schema` catalogs at startup and cached in-memory.
+* **Schema Reader Strategy:** Schema is queried from the PostgreSQL `information_schema` catalogs at startup and cached in a distributed **Redis** cache. Context like Few-Shot examples and Business Rules are also cached in Redis with a TTL to prevent redundant database queries.
 * **SQL Generation Flow:**
   1. Frontend submits a question to `POST /api/v1/query/generate` along with optional role headers.
   2. Router calls `context.py` to retrieve relevant context.

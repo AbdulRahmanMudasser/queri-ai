@@ -18,7 +18,7 @@ This document controls execution for the initial scaffolding of the FastAPI back
 ## 4. Ownership And Delivery Notes
 * **Owner:** Abdul Rahman
 * **Priority:** High
-* **Target Window:** [YYYY-MM-DD to YYYY-MM-DD]
+* **Target Window:** June - July 2026
 * **Related PRD Section:** Section 8 (Platform Scope) and Section 10 (Acceptance Criteria)
 * **Related Build Plan Section:** Section 4 (Directory Structure) and Section 11 (Code Quality)
 
