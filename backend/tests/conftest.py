@@ -11,6 +11,15 @@ os.environ["GEMINI_API_KEY"] = "test-key"
 from app.main import app  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def mock_engine_begin() -> Generator[MagicMock, None, None]:
+    with patch("app.db.session.engine") as mock_engine:
+        mock_conn = AsyncMock()
+        mock_engine.begin.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_engine.begin.return_value.__aexit__ = AsyncMock(return_value=None)
+        yield mock_engine
+
+
 @pytest.fixture
 def client() -> Generator[TestClient, None, None]:
     with TestClient(app) as c:
@@ -21,6 +30,8 @@ def client() -> Generator[TestClient, None, None]:
 def mock_db_session() -> Generator[AsyncMock, None, None]:
     with patch("app.db.session.AsyncSessionLocal") as mock_sessionmaker:
         mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_session.execute.return_value = mock_result
         mock_transaction = AsyncMock()
         mock_session.begin = MagicMock(return_value=mock_transaction)
         mock_sessionmaker.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -44,4 +55,3 @@ def mock_embeddings_provider() -> Generator[MagicMock, None, None]:
     target_path = "app.api.v1.endpoints.query.get_embeddings_provider"
     with patch(target_path, return_value=mock_provider) as p:
         yield p
-
