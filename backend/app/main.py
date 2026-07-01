@@ -26,6 +26,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001
     # Step 1: Create ORM tables (idempotent — CREATE TABLE IF NOT EXISTS)
     try:
         async with engine.begin() as conn:
+            from sqlalchemy import text
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database Tables Verified/Created.")
     except Exception:
