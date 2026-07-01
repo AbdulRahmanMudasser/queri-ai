@@ -93,11 +93,11 @@ class TestQuerySelfCorrection:
             statement: object,
             *_args: object,
             **_kwargs: object,
-        ) -> AsyncMock:
+        ) -> MagicMock:
             stmt_str = str(statement)
             if "COUNT(id)" in stmt_str:
                 raise db_error
-            return AsyncMock()
+            return MagicMock()
 
         mock_db_session.execute.side_effect = mock_execute_side_effect
 

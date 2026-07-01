@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.reader import get_cached_schema
 from app.db.session import get_db
-from app.services.context import prune_schema
+from app.services.context import get_business_rules, get_few_shot_examples, prune_schema
 from app.services.embeddings import get_embeddings_provider
 from app.services.translator import explain, translate
 from app.services.validator import limit_sql, validate_sql
@@ -36,7 +36,6 @@ class ExecuteResponse(BaseModel):
     rows: list[list[Any]]
 
 
-
 class ExplainRequest(BaseModel):
     question: str = Field(min_length=1)
     sql: str = Field(min_length=1)
@@ -53,25 +52,42 @@ async def generate_query(
     body: QueryRequest,
     db: AsyncSession = Depends(get_db),
 ) -> QueryResponse:
-    logger.info("Query generate request: %s", body.question[:80])
+    logger.info("Query Generate Request: %s", body.question[:80])
 
     try:
         tables = get_cached_schema()
     except RuntimeError:
-        logger.warning("Schema cache not loaded for query generation")
+        logger.warning("Schema Cache Not Loaded For Query Generation")
         raise HTTPException(status_code=503, detail="Schema not yet loaded") from None
 
-
+    provider = get_embeddings_provider()
     try:
-        provider = get_embeddings_provider()
         pruned_tables = await prune_schema(body.question, tables, provider)
     except Exception as exc:
-        logger.warning("Schema pruning failed, falling back to full schema catalog: %s", exc)
+        logger.warning("Schema Pruning Failed, Falling Back To Full Schema Catalog: %s", exc)
         pruned_tables = tables
 
     try:
+        few_shot = await get_few_shot_examples(body.question, db, provider)
+        rules = await get_business_rules(db)
+        logger.info(
+            "Fetched %d Few-Shot Examples And %d Business Rules For Question: %s",
+            len(few_shot),
+            len(rules),
+            body.question[:80],
+        )
+    except Exception as exc:
+        logger.warning("Few-Shot/Rules Fetch Failed, Proceeding With Empty Context: %s", exc)
+        few_shot, rules = [], []
+
+    try:
         # Initial attempt
-        translation = await translate(body.question, pruned_tables)
+        translation = await translate(
+            body.question,
+            pruned_tables,
+            few_shot_examples=few_shot,
+            business_rules=rules,
+        )
         raw_sql = translation["sql"]
         reasoning = translation["reasoning"]
 
@@ -86,7 +102,7 @@ async def generate_query(
 
     except (ValueError, DBAPIError) as exc:
         logger.warning(
-            "Initial query generation failed validation or dry-run, initiating self-correction: %s",
+            "Initial Query Generation Failed Validation Or Dry-Run, Initiating Self-Correction: %s",
             exc,
         )
 
@@ -106,6 +122,8 @@ async def generate_query(
                 pruned_tables,
                 previous_sql=failed_sql,
                 error_message=error_msg,
+                few_shot_examples=few_shot,
+                business_rules=rules,
             )
             raw_sql = correction["sql"]
             reasoning = correction["reasoning"]
@@ -120,7 +138,7 @@ async def generate_query(
                 await db.execute(text(f"EXPLAIN {sql}"))
 
         except Exception as retry_exc:
-            logger.exception("Query self-correction retry failed", exc_info=retry_exc)
+            logger.exception("Query Self-Correction Retry Failed", exc_info=retry_exc)
             err_detail = (
                 str(getattr(retry_exc, "orig", retry_exc))
                 if isinstance(retry_exc, DBAPIError)
@@ -132,7 +150,7 @@ async def generate_query(
             ) from retry_exc
 
     except Exception as exc:
-        logger.exception("Gemini translation failed with unexpected error", exc_info=exc)
+        logger.exception("Gemini Translation Failed With Unexpected Error", exc_info=exc)
         raise HTTPException(
             status_code=503,
             detail="Translation service currently unavailable",
@@ -146,12 +164,12 @@ async def execute_query(
     body: ExecuteRequest,
     db: AsyncSession = Depends(get_db),
 ) -> ExecuteResponse:
-    logger.info("Query execute request: %s", body.sql[:80])
+    logger.info("Query Execute Request: %s", body.sql[:80])
 
     try:
         tables = get_cached_schema()
     except RuntimeError:
-        logger.warning("Schema cache not loaded for query execution")
+        logger.warning("Schema Cache Not Loaded For Query Execution")
         raise HTTPException(status_code=503, detail="Schema not yet loaded") from None
 
     try:
@@ -160,7 +178,7 @@ async def execute_query(
         # Apply AST-level limit to prevent memory/performance issues
         limited_sql = limit_sql(validated, max_limit=100)
     except ValueError as exc:
-        logger.warning("SQL validation failed before execution: %s", exc)
+        logger.warning("SQL Validation Failed Before Execution: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from None
 
     try:
@@ -178,12 +196,12 @@ async def execute_query(
     except DBAPIError as exc:
         orig = getattr(exc, "orig", None)
         if orig and getattr(orig, "sqlstate", None) == "57014":
-            logger.warning("Query execution timed out: %s", body.sql[:200])
+            logger.warning("Query Execution Timed Out: %s", body.sql[:200])
             raise HTTPException(
                 status_code=408,
                 detail="Query execution timed out (5.0s limit)",
             ) from exc
-        logger.warning("Database execution error: %s", exc)
+        logger.warning("Database Execution Error: %s", exc)
         detail = str(orig) if orig else str(exc)
         raise HTTPException(
             status_code=400,
@@ -193,7 +211,7 @@ async def execute_query(
 
 @router.post("/query/explain")
 async def explain_query(body: ExplainRequest) -> ExplainResponse:
-    logger.info("Query explain request for question: %s", body.question[:80])
+    logger.info("Query Explain Request For Question: %s", body.question[:80])
 
     try:
         explanation = await explain(
@@ -203,7 +221,7 @@ async def explain_query(body: ExplainRequest) -> ExplainResponse:
             rows=body.rows,
         )
     except Exception as exc:
-        logger.exception("Gemini explanation generation failed", exc_info=exc)
+        logger.exception("Gemini Explanation Generation Failed", exc_info=exc)
         raise HTTPException(
             status_code=503,
             detail="Explanation service currently unavailable",

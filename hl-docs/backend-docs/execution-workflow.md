@@ -41,17 +41,16 @@ Every completed phase must satisfy all of the following:
 6. Evidence is logged in the linked phase file.
 
 ## 6. Current Active Phase
-* **Current Phase:** Phase 07 - Few-Shot SQL Retrieval & Business Rules
+* **Current Phase:** Phase 08 - Query History Memory & RBAC Masking
 * **Status:** Ready
 * **Owner:** Abdul Rahman
-* **Linked Phase Doc:** [phase-07-fewshot-rules.md](./phase-07-fewshot-rules.md)
-* **Immediate Goal:** Implement dynamic few-shot retrieval from fewshot database files and formulate business rule prompts to enhance translation accuracy.
+* **Linked Phase Doc:** [phase-08-memory-rbac.md](./phase-08-memory-rbac.md)
+* **Immediate Goal:** Implement database memory context for multi-turn conversations and RBAC column/table masking based on user roles.
 * **Current Blockers:** None
-* **Next:** Phase 08 - Query History Memory & RBAC Masking
+* **Next:** Phase 09 - Optimization, Performance & Caching
 
 ## 7. Ready Queue
-- [Phase 07 - Few-Shot SQL Retrieval & Business Rules](./phase-07-fewshot-rules.md)
-- [Phase 08 - Query History Memory & RBAC Masking](./phase-08-memory-rbac.md)
+- [Phase 08 - Query History Memory & RBAC Masking](./phase-08-memory-rbac.md) ← **Active**
 
 ## 8. Phase Register
 | Phase | Name | Status | Priority | Owner | Depends On | Linked File | Target Window |
@@ -62,8 +61,9 @@ Every completed phase must satisfy all of the following:
 | 04 | Safe Query Execution & AI Explanation | Completed | High | Abdul Rahman | Phase 03 | [phase-04-safe-execution.md](./phase-04-safe-execution.md) | 2026-06-29 |
 | 05 | Structured JSON Output & Self-Correction | Completed | High | Abdul Rahman | Phase 04 | [phase-05-structured-correction.md](./phase-05-structured-correction.md) | 2026-06-29 |
 | 06 | Context Builder & Semantic Pruning (RAG) | Completed | High | Abdul Rahman | Phase 05 | [phase-06-schema-pruning.md](./phase-06-schema-pruning.md) | 2026-06-30 |
-| 07 | Few-Shot SQL Retrieval & Business Rules | Ready | High | Abdul Rahman | Phase 06 | [phase-07-fewshot-rules.md](./phase-07-fewshot-rules.md) | 2026-06-30 |
-| 08 | Query History Memory & RBAC Masking | Planned | High | Abdul Rahman | Phase 07 | [phase-08-memory-rbac.md](./phase-08-memory-rbac.md) | 2026-06-30 |
+| 07 | ORM Models, DB Tables & Startup Seeder | Completed | High | Abdul Rahman | Phase 06 | [phase-07-fewshot-rules.md](./phase-07-fewshot-rules.md) | 2026-07-01 |
+| 07b | Few-Shot Retrieval & Prompt Integration | Completed | High | Abdul Rahman | Phase 07 | [phase-07b-fewshot-integration.md](./phase-07b-fewshot-integration.md) | 2026-07-01 |
+| 08 | Query History Memory & RBAC Masking | Ready | High | Abdul Rahman | Phase 07b | [phase-08-memory-rbac.md](./phase-08-memory-rbac.md) | 2026-07-01 |
 
 ## 9. Blockers And Risks
 
@@ -91,6 +91,10 @@ Use this section to track material execution updates, not every minor edit.
 | 2026-06-29 | Phase 04 / Safe Query Execution & AI Explanation | In Progress -> Completed | Execute SQL inside read-only transaction with 5s timeout and 100-row limit, summarize via Gemini. | Pytest outputs passing. |
 | 2026-06-29 | Phase 05 / Structured JSON Output & Self-Correction | Planned -> Completed | Structured response schema config for Gemini, AST catalog checking for tables/columns, retry execution loop. | Pytest outputs passing. |
 | 2026-06-29 | Phase 06 / Context Builder & Semantic Pruning (RAG) | Ready -> Completed | Modular embeddings providers (fastembed & Gemini), custom similarity thresholds, dynamic schema context pruning, and token logging. | Pytest outputs passing. |
+| 2026-07-01 | Phase 07 / ORM Models, DB Tables & Startup Seeder | Planned -> In Progress | Phase split from original single Phase 07 into 07 (data layer) and 07b (service/API integration) for cleaner verification gates. Scope: `db/models.py`, `db/seeder.py`, lifespan wiring, `test_seeder.py`. | — |
+| 2026-07-01 | Phase 07 / ORM Models, DB Tables & Startup Seeder | In Progress -> Completed | Introduced ORM models, seeder logic, engine lifespan table creation, unit tests. Ruff/Mypy/Pytest 100% pass. | [Walkthrough](./walkthrough.md) |
+| 2026-07-01 | Phase 07b / Few-Shot Retrieval & Prompt Integration | Ready -> Completed | Integrated semantic vector lookup for few-shot examples and business rules. Prompt formats structured. Ruff/Mypy/Pytest 100% pass. | [Walkthrough](./walkthrough.md) |
+
 
 ## 12. Workflow Rules
 - Every phase listed in the phase register must have a real linked file.

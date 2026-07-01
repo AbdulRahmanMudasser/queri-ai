@@ -13,7 +13,7 @@ _schema_cache: dict[str, Any] | None = None
 async def load_schema(db: AsyncSession) -> list[dict[str, Any]]:
     rows = await _fetch_schema(db)
     tables = _populate_cache(rows)
-    logger.info("Schema cache populated with %d tables", len(tables))
+    logger.info("Schema Cache Populated With %d Tables", len(tables))
     return rows
 
 

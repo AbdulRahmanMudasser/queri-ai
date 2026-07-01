@@ -15,7 +15,7 @@ async def get_schema() -> dict[str, Any] | JSONResponse:
     try:
         tables = get_cached_schema()
     except RuntimeError:
-        logger.warning("Schema cache not loaded")
+        logger.warning("Schema Cache Not Loaded")
         return JSONResponse(
             status_code=503,
             content={"detail": "Schema not yet loaded"},
