@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-import app.services.context
 from app.services.context import cosine_similarity, prune_schema
 from app.services.embeddings import EmbeddingsProvider
 
@@ -33,6 +32,22 @@ MOCK_SCHEMA = [
 ]
 
 
+@pytest.fixture
+def mock_redis():
+    with patch("app.services.context.redis_client", new_callable=AsyncMock) as mock:
+        store = {}
+
+        async def mock_get(key):
+            return store.get(key)
+
+        async def mock_set(key, value, ex=None):
+            store[key] = value
+
+        mock.get.side_effect = mock_get
+        mock.set.side_effect = mock_set
+        yield mock
+
+
 def test_cosine_similarity_edge_cases() -> None:
     # Exact match
     assert abs(cosine_similarity([1.0, 0.0], [1.0, 0.0]) - 1.0) < 1e-6
@@ -49,11 +64,7 @@ def test_cosine_similarity_edge_cases() -> None:
 
 
 @pytest.mark.asyncio
-async def test_prune_schema_threshold() -> None:
-    # Clear global cache to isolate test run
-    # Clear global cache to isolate test run
-    app.services.context._table_embeddings_cache.clear()
-
+async def test_prune_schema_threshold(mock_redis) -> None:
     class FixedEmbeddingsProvider(EmbeddingsProvider):
         async def get_embedding(self, text: str) -> list[float]:
             # Use exact prefix matching to avoid substring matching conflicts
@@ -71,8 +82,6 @@ async def test_prune_schema_threshold() -> None:
 
     provider = FixedEmbeddingsProvider()
 
-    # Question is highly related to hotels, and partially to bookings (>=0.35)
-    # Target score: hotels = 0.9, bookings = 0.4, users = 0.0
     pruned = await prune_schema("hotels question", MOCK_SCHEMA, provider)
     pruned_names = [t["name"] for t in pruned]
     assert "hotels" in pruned_names
@@ -81,11 +90,7 @@ async def test_prune_schema_threshold() -> None:
 
 
 @pytest.mark.asyncio
-async def test_prune_schema_fallback() -> None:
-    # Clear global cache to isolate test run
-    # Clear global cache to isolate test run
-    app.services.context._table_embeddings_cache.clear()
-
+async def test_prune_schema_fallback(mock_redis) -> None:
     class FixedEmbeddingsProvider(EmbeddingsProvider):
         async def get_embedding(self, text: str) -> list[float]:
             # Use exact prefix matching
@@ -110,19 +115,16 @@ async def test_prune_schema_fallback() -> None:
     assert {t["name"] for t in pruned} == {"hotels", "bookings", "users"}
 
 
-@patch("app.api.v1.endpoints.query.get_cached_schema")
+@patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
 @patch("app.api.v1.endpoints.query.translate")
 def test_generate_endpoint_pruning_integration(
     mock_translate: MagicMock,
-    mock_get_cached_schema: MagicMock,
+    mock_get_cached_schema: AsyncMock,
     client: TestClient,
     mock_db_session: AsyncMock,
+    mock_redis,
 ) -> None:
     _ = mock_db_session
-
-    # Clear global cache to isolate test run
-    # Clear global cache to isolate test run
-    app.services.context._table_embeddings_cache.clear()
 
     mock_get_cached_schema.return_value = MOCK_SCHEMA
     mock_translate.return_value = {
@@ -142,11 +144,6 @@ def test_generate_endpoint_pruning_integration(
     assert "hotels" in sql_result
     assert mock_translate.call_count == 1
 
-    # Verify that the translation was called with the pruned schema,
-    # and the mock embeddings provider was invoked
     args, _ = mock_translate.call_args
-    # First arg is question, second arg is the schema list passed to translate
     pruned_schema_passed = args[1]
-    # Pruned schema should not contain all 3 tables if RAG pruned it,
-    # or should contain elements filtered by our autouse mock embeddings provider
     assert isinstance(pruned_schema_passed, list)

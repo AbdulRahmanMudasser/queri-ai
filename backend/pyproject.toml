@@ -16,6 +16,9 @@ asyncpg = "^0.30.0"
 google-generativeai = "^0.8.0"
 fastembed = "^0.8.0"
 pgvector = "^0.4.2"
+alembic = "^1.18.5"
+redis = "^8.0.1"
+jinja2 = "^3.1.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
@@ -24,6 +27,7 @@ httpx = "^0.28.0"
 ruff = "^0.9.0"
 mypy = "^1.15.0"
 pre-commit = "^4.0.0"
+types-redis = "^4.6.0.20241004"
 
 [build-system]
 requires = ["poetry-core"]

@@ -49,7 +49,7 @@ MOCK_SCHEMA = [
 ]
 
 
-@patch("app.api.v1.endpoints.query.get_cached_schema")
+@patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
 def test_execute_query_happy_path(
     mock_get_cached_schema: object,
     client: TestClient,
@@ -76,7 +76,7 @@ def test_execute_query_happy_path(
     assert mock_db_session.execute.call_count >= 3
 
 
-@patch("app.api.v1.endpoints.query.get_cached_schema")
+@patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
 def test_execute_query_unsafe(
     mock_get_cached_schema: object,
     client: TestClient,
@@ -92,7 +92,7 @@ def test_execute_query_unsafe(
     assert mock_db_session.execute.call_count == 0
 
 
-@patch("app.api.v1.endpoints.query.get_cached_schema")
+@patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
 def test_execute_query_syntax_error(
     mock_get_cached_schema: object,
     client: TestClient,
@@ -118,7 +118,7 @@ def test_execute_query_syntax_error(
     assert "Database execution error" in response.json()["detail"]
 
 
-@patch("app.api.v1.endpoints.query.get_cached_schema")
+@patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
 def test_execute_query_timeout(
     mock_get_cached_schema: object,
     client: TestClient,

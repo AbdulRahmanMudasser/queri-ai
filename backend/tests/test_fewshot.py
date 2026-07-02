@@ -6,7 +6,20 @@ from fastapi.testclient import TestClient
 from app.db.models import BusinessRule, FewShotExample
 from app.services.context import get_business_rules, get_few_shot_examples
 from app.services.embeddings import EmbeddingsProvider
-from app.services.translator import _build_prompt
+from app.services.translator import jinja_env
+
+
+@pytest.fixture
+def mock_redis():
+    with patch("app.services.context.redis_client", new_callable=AsyncMock) as mock:
+        store = {}
+        async def mock_get(key):
+            return store.get(key)
+        async def mock_set(key, value, ex=None):
+            store[key] = value
+        mock.get.side_effect = mock_get
+        mock.set.side_effect = mock_set
+        yield mock
 
 
 class DummyProvider(EmbeddingsProvider):
@@ -39,7 +52,7 @@ async def test_get_few_shot_examples_returns_top_k() -> None:
         sql_query="SELECT * FROM bookings",
         question_vector=[0.0, 1.0, 0.0],
     )
-    ex3 = FewShotExample(
+    _ = FewShotExample(
         id=3,
         question="show users",
         sql_query="SELECT * FROM users",
@@ -70,7 +83,7 @@ async def test_get_few_shot_examples_empty_db() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_business_rules_returns_all_values() -> None:
+async def test_get_business_rules_returns_all_values(mock_redis) -> None:
     db = AsyncMock()
     mock_result = MagicMock()
 
@@ -85,7 +98,7 @@ async def test_get_business_rules_returns_all_values() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_business_rules_empty_db() -> None:
+async def test_get_business_rules_empty_db(mock_redis) -> None:
     db = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalars.return_value.all.return_value = []
@@ -97,7 +110,10 @@ async def test_get_business_rules_empty_db() -> None:
 
 def test_build_prompt_includes_few_shot_section() -> None:
     examples = [{"question": "show me hotels", "sql": "SELECT * FROM hotels"}]
-    prompt = _build_prompt("show hotels", "Table: hotels", few_shot_examples=examples)
+    schema = [{"name": "hotels", "columns": [{"name": "id", "type": "int"}]}]
+    prompt = jinja_env.get_template("generate.j2").render(
+        question="show hotels", schema=schema, few_shot_examples=examples
+    )
     assert "## Similar Query Examples" in prompt
     assert "Q: show me hotels" in prompt
     assert "SQL: SELECT * FROM hotels" in prompt
@@ -105,15 +121,19 @@ def test_build_prompt_includes_few_shot_section() -> None:
 
 def test_build_prompt_includes_business_rules_section() -> None:
     rules = ["1=confirmed", "status NOT IN (3)"]
-    prompt = _build_prompt("show bookings", "Table: bookings", business_rules=rules)
+    schema = [{"name": "bookings", "columns": [{"name": "id", "type": "int"}]}]
+    prompt = jinja_env.get_template("generate.j2").render(
+        question="show bookings", schema=schema, business_rules=rules
+    )
     assert "## Business Rules" in prompt
     assert "- 1=confirmed" in prompt
     assert "- status NOT IN (3)" in prompt
 
 
 def test_build_prompt_skips_sections_when_empty() -> None:
-    prompt = _build_prompt(
-        "show bookings", "Table: bookings", few_shot_examples=[], business_rules=[]
+    schema = [{"name": "bookings", "columns": [{"name": "id", "type": "int"}]}]
+    prompt = jinja_env.get_template("generate.j2").render(
+        question="show bookings", schema=schema, few_shot_examples=[], business_rules=[]
     )
     assert "## Similar Query Examples" not in prompt
     assert "## Business Rules" not in prompt

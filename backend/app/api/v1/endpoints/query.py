@@ -1,16 +1,19 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.core.rbac import apply_rbac_mask
 from app.db.reader import get_cached_schema
 from app.db.session import get_db
 from app.services.context import get_business_rules, get_few_shot_examples, prune_schema
 from app.services.embeddings import get_embeddings_provider
+from app.services.history import append_session_history, get_session_history
 from app.services.translator import explain, translate
 from app.services.validator import limit_sql, validate_sql
 
@@ -20,6 +23,7 @@ router = APIRouter()
 
 class QueryRequest(BaseModel):
     question: str = Field(min_length=1)
+    session_id: str | None = None
 
 
 class QueryResponse(BaseModel):
@@ -50,12 +54,14 @@ class ExplainResponse(BaseModel):
 @router.post("/query/generate")
 async def generate_query(
     body: QueryRequest,
+    x_user_role: str | None = Header(default="Customer"),
     db: AsyncSession = Depends(get_db),
 ) -> QueryResponse:
-    logger.info("Query Generate Request: %s", body.question[:80])
+    logger.info("Query Generate Request: %s (Role: %s)", body.question[:80], x_user_role)
 
     try:
-        tables = get_cached_schema()
+        tables = await get_cached_schema()
+        tables = apply_rbac_mask(tables, x_user_role)
     except RuntimeError:
         logger.warning("Schema Cache Not Loaded For Query Generation")
         raise HTTPException(status_code=503, detail="Schema not yet loaded") from None
@@ -81,12 +87,14 @@ async def generate_query(
         few_shot, rules = [], []
 
     try:
+        history = await get_session_history(body.session_id)
         # Initial attempt
         translation = await translate(
             body.question,
             pruned_tables,
             few_shot_examples=few_shot,
             business_rules=rules,
+            history=history,
         )
         raw_sql = translation["sql"]
         reasoning = translation["reasoning"]
@@ -95,6 +103,7 @@ async def generate_query(
         sql = validate_sql(raw_sql, tables)
 
         # Dry-run execution using EXPLAIN within a read-only transaction block
+        await db.rollback()
         async with db.begin():
             await db.execute(text("SET TRANSACTION READ ONLY"))
             await db.execute(text("SET local statement_timeout = 2000"))
@@ -124,6 +133,7 @@ async def generate_query(
                 error_message=error_msg,
                 few_shot_examples=few_shot,
                 business_rules=rules,
+                history=history,
             )
             raw_sql = correction["sql"]
             reasoning = correction["reasoning"]
@@ -132,6 +142,7 @@ async def generate_query(
             sql = validate_sql(raw_sql, tables)
 
             # Re-run dry-run execution
+            await db.rollback()
             async with db.begin():
                 await db.execute(text("SET TRANSACTION READ ONLY"))
                 await db.execute(text("SET local statement_timeout = 2000"))
@@ -156,18 +167,23 @@ async def generate_query(
             detail="Translation service currently unavailable",
         ) from exc
 
+    # Successfully generated and validated. Save to memory.
+    await append_session_history(body.session_id, body.question, sql)
+
     return QueryResponse(sql=sql, reasoning=reasoning)
 
 
 @router.post("/query/execute")
 async def execute_query(
     body: ExecuteRequest,
+    x_user_role: str | None = Header(default="Customer"),
     db: AsyncSession = Depends(get_db),
 ) -> ExecuteResponse:
-    logger.info("Query Execute Request: %s", body.sql[:80])
+    logger.info("Query Execute Request: %s (Role: %s)", body.sql[:80], x_user_role)
 
     try:
-        tables = get_cached_schema()
+        tables = await get_cached_schema()
+        tables = apply_rbac_mask(tables, x_user_role)
     except RuntimeError:
         logger.warning("Schema Cache Not Loaded For Query Execution")
         raise HTTPException(status_code=503, detail="Schema not yet loaded") from None
@@ -175,8 +191,10 @@ async def execute_query(
     try:
         # Defense-in-depth recheck validation
         validated = validate_sql(body.sql, tables)
-        # Apply AST-level limit to prevent memory/performance issues
-        limited_sql = limit_sql(validated, max_limit=100)
+        logger.info("Validated AST Successfully. Applying Row Limit.")
+        limited_sql = limit_sql(validated, max_limit=settings.MAX_ROW_LIMIT)
+
+        logger.info("Executing Validated SQL (Read-Only)")
     except ValueError as exc:
         logger.warning("SQL Validation Failed Before Execution: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from None
@@ -185,21 +203,23 @@ async def execute_query(
         # Execute query within a read-only transaction block with statement timeout
         async with db.begin():
             await db.execute(text("SET TRANSACTION READ ONLY"))
-            await db.execute(text("SET local statement_timeout = 5000"))
+            await db.execute(text(f"SET local statement_timeout = {settings.STATEMENT_TIMEOUT_MS}"))
 
             result = await db.execute(text(limited_sql))
             columns = list(result.keys())
-            rows = [list(row) for row in result.fetchmany(100)]
+            # Fetch up to MAX_ROW_LIMIT rows
+            rows = [list(row) for row in result.fetchmany(settings.MAX_ROW_LIMIT)]
 
             return ExecuteResponse(columns=columns, rows=rows)
 
     except DBAPIError as exc:
         orig = getattr(exc, "orig", None)
-        if orig and getattr(orig, "sqlstate", None) == "57014":
+        error_msg = str(orig) if orig else str(exc)
+        if "timeout" in error_msg:
             logger.warning("Query Execution Timed Out: %s", body.sql[:200])
             raise HTTPException(
                 status_code=408,
-                detail="Query execution timed out (5.0s limit)",
+                detail=f"Query execution timed out ({settings.STATEMENT_TIMEOUT_MS / 1000}s limit)",
             ) from exc
         logger.warning("Database Execution Error: %s", exc)
         detail = str(orig) if orig else str(exc)

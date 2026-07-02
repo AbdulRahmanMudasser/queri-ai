@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 os.environ["DATABASE_URL"] = "postgresql+asyncpg://user:pass@localhost:5432/db"
 os.environ["GEMINI_API_KEY"] = "test-key"
+os.environ["REDIS_URL"] = "redis://localhost:6379"
 
 from app.main import app  # noqa: E402
 
@@ -22,8 +23,12 @@ def mock_engine_begin() -> Generator[MagicMock, None, None]:
 
 @pytest.fixture
 def client() -> Generator[TestClient, None, None]:
-    with TestClient(app) as c:
-        yield c
+    with patch("app.main.seed_database", new_callable=AsyncMock), patch(
+        "app.main.load_schema", new_callable=AsyncMock
+    ) as mock_load:
+        mock_load.return_value = []
+        with TestClient(app) as c:
+            yield c
 
 
 @pytest.fixture
