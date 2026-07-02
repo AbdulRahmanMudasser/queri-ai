@@ -98,6 +98,24 @@ backend/
 
 ---
 
+## 4.5. Environment Configuration
+
+To run the Queri.ai backend, a `.env` file must be present in the `backend/` directory with the following variables:
+
+| Variable | Description | Requirement | Example |
+|---|---|---|---|
+| `DATABASE_URL` | PostgreSQL Async connection string | **Required** | `postgresql+asyncpg://user:pass@localhost:5432/db` |
+| `GEMINI_API_KEY` | Google AI Studio Key | **Required** | `AIzaSy...` |
+| `REDIS_URL` | Distributed cache for history/RAG | **Required** | `redis://localhost:6379` |
+| `ENV` | Environment mode | Optional | `development` |
+| `EMBEDDING_PROVIDER` | `local` or `gemini` | Optional | `local` |
+| `LLM_MODEL_NAME` | Configurable model string | Optional | `models/gemini-2.5-flash-lite` |
+| `SIMILARITY_THRESHOLD`| Cosine distance cutoff | Optional | `0.35` |
+| `MAX_ROW_LIMIT` | Hard limits applied via SQL AST | Optional | `100` |
+| `STATEMENT_TIMEOUT_MS`| Server-side query abortion timeout | Optional | `5000` |
+
+---
+
 ## 5. Lifespan and Connection Management
 * **Lifespan Manager:** The application uses FastAPI's `lifespan` context manager. On startup, it establishes the database engine connection pool and caches the database metadata in Redis. **Fail-Fast Policy:** If the database is unreachable or schema loading fails, the application will intentionally crash during startup to allow orchestration layers to restart it, preventing zombie states. On shutdown, it closes all active pools to avoid connection leaks.
 * **Dependency Injection:** Database sessions are fetched per request using a dependency helper injected into routers:
