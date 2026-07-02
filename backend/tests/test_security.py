@@ -141,8 +141,8 @@ MOCK_SCHEMA = [
 
 
 class TestGenerateEndpoint:
-    @patch("app.api.v1.endpoints.query.get_cached_schema")
-    @patch("app.api.v1.endpoints.query.translate")
+    @patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
+    @patch("app.api.v1.endpoints.query.translate", new_callable=AsyncMock)
     def test_happy_path(
         self,
         mock_translate: object,
@@ -168,8 +168,8 @@ class TestGenerateEndpoint:
         assert "SELECT" in data["sql"]
         assert "reasoning" in data
 
-    @patch("app.api.v1.endpoints.query.get_cached_schema")
-    @patch("app.api.v1.endpoints.query.translate")
+    @patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
+    @patch("app.api.v1.endpoints.query.translate", new_callable=AsyncMock)
     def test_unsafe_sql_blocked(
         self,
         mock_translate: object,
@@ -192,7 +192,7 @@ class TestGenerateEndpoint:
         assert response.status_code == 400
         assert "unsafe operation" in response.json()["detail"]
 
-    @patch("app.api.v1.endpoints.query.get_cached_schema")
+    @patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
     def test_schema_not_loaded(
         self,
         mock_get_cached_schema: object,
@@ -208,8 +208,8 @@ class TestGenerateEndpoint:
         )
         assert response.status_code == 503
 
-    @patch("app.api.v1.endpoints.query.get_cached_schema")
-    @patch("app.api.v1.endpoints.query.translate")
+    @patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
+    @patch("app.api.v1.endpoints.query.translate", new_callable=AsyncMock)
     def test_gemini_error(
         self,
         mock_translate: object,
@@ -231,22 +231,72 @@ class TestGenerateEndpoint:
 
 class TestExplainCapping:
     @patch("app.services.translator._model.generate_content_async")
-    @patch("app.services.translator._build_explain_prompt")
+    @patch("jinja2.Template.render")
     @pytest.mark.anyio
     async def test_explain_caps_rows(
         self,
-        mock_build_prompt: object,
+        mock_render: object,
         mock_generate: object,
     ) -> None:
         mock_generate.return_value = AsyncMock(text="Explanation")
-        mock_build_prompt.return_value = "Prompt text"
+        mock_render.return_value = "Prompt text"
 
         large_rows = [[i] for i in range(150)]
         await explain("question", "SELECT *", ["col"], large_rows)
 
-        # Assert that the prompt builder was called with at most 100 rows
-        mock_build_prompt.assert_called_once()
-        args, _ = mock_build_prompt.call_args
-        assert len(args[3]) == 100
+        mock_render.assert_called_once()
+        _, kwargs = mock_render.call_args
+        assert len(kwargs["rows"]) == 100
         # verify it's the first 100 rows
-        assert args[3] == [[i] for i in range(100)]
+        assert kwargs["rows"] == [[i] for i in range(100)]
+
+
+class TestRbacMasking:
+    @patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
+    @patch("app.api.v1.endpoints.query.translate", new_callable=AsyncMock)
+    def test_rbac_masking_generate(
+        self,
+        mock_translate: object,
+        mock_get_cached_schema: object,
+        client: TestClient,
+        mock_db_session: object,
+    ) -> None:
+        _ = mock_db_session
+        mock_get_cached_schema.return_value = [
+            {"name": "salaries", "columns": [{"name": "id", "type": "integer"}]}
+        ]
+        mock_translate.return_value = {
+            "sql": "SELECT id FROM salaries",
+            "reasoning": "User wants salaries",
+            "tables_used": ["salaries"],
+        }
+
+        # Staff role is blocked from seeing 'salaries' in rbac.py
+        response = client.post(
+            "/api/v1/query/generate",
+            headers={"X-User-Role": "staff"},
+            json={"question": "show salaries"},
+        )
+        assert response.status_code == 400
+        assert "Table 'salaries' does not exist" in response.json()["detail"]
+
+    @patch("app.api.v1.endpoints.query.get_cached_schema", new_callable=AsyncMock)
+    def test_rbac_masking_execute(
+        self,
+        mock_get_cached_schema: object,
+        client: TestClient,
+        mock_db_session: object,
+    ) -> None:
+        _ = mock_db_session
+        mock_get_cached_schema.return_value = [
+            {"name": "salaries", "columns": [{"name": "id", "type": "integer"}]}
+        ]
+
+        # Try to execute a query against salaries as staff
+        response = client.post(
+            "/api/v1/query/execute",
+            headers={"X-User-Role": "staff"},
+            json={"sql": "SELECT id FROM salaries"},
+        )
+        assert response.status_code == 400
+        assert "Table 'salaries' does not exist" in response.json()["detail"]

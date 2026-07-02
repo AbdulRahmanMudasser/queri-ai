@@ -67,18 +67,23 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "Admin",
+                "description": "Optional: Defines the user's role for RBAC schema masking. Defaults to 'Customer' (least privilege)."
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"question\": \"How many users signed up last week?\"\n}"
+              "raw": "{\n    \"question\": \"How many users signed up last week?\",\n    \"session_id\": \"test-session-123\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/query/generate",
               "host": ["{{baseUrl}}"],
               "path": ["query", "generate"]
             },
-            "description": "Translates a natural language question into a PostgreSQL query. It uses Gemini LLM, prunes the schema context via embeddings, checks against AST safety rules, and performs a database dry-run."
+            "description": "Translates a natural language question into a PostgreSQL query. It uses Gemini LLM, prunes the schema context via FastEmbed vector embeddings, checks against SQLGlot AST safety rules, and performs a database dry-run. History is managed automatically if session_id is provided."
           },
           "response": [
             {
@@ -109,6 +114,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-User-Role",
+                "value": "Admin",
+                "description": "Optional: Defines the user's role for RBAC schema masking. Defaults to 'Customer' (least privilege)."
               }
             ],
             "body": {
@@ -120,7 +130,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["query", "execute"]
             },
-            "description": "Executes a validated SQL query against the database. It enforces read-only transactions, a strict 5-second statement timeout, and an AST-level row limit of 100."
+            "description": "Executes a validated SQL query against the database. It enforces read-only transactions, a strict configurable statement timeout (default 5000ms), and an AST-level row limit override (default 100) to prevent OOM errors."
           },
           "response": [
             {

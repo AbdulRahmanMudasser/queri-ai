@@ -1,5 +1,5 @@
-from pgvector.sqlalchemy import Vector
-from sqlalchemy import Integer, String
+from pgvector.sqlalchemy import Vector  # type: ignore[import-untyped]
+from sqlalchemy import JSON, Column, Float, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 

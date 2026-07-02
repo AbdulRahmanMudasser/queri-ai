@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/schema", response_model=None)
 async def get_schema() -> dict[str, Any] | JSONResponse:
     try:
-        tables = get_cached_schema()
+        tables = await get_cached_schema()
     except RuntimeError:
         logger.warning("Schema Cache Not Loaded")
         return JSONResponse(

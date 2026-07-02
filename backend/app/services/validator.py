@@ -31,6 +31,8 @@ def validate_sql(sql: str, schema: list[dict[str, Any]] | None = None) -> str:
     except sqlglot.errors.ParseError as e:
         raise ValueError(f"Invalid SQL syntax: {e}") from e
 
+    statements = [stmt for stmt in statements if stmt is not None]
+
     if len(statements) > 1:
         raise ValueError("Multiple statements are not allowed (stacked queries)")
 
@@ -45,7 +47,10 @@ def validate_sql(sql: str, schema: list[dict[str, Any]] | None = None) -> str:
 
     # Table and Column validation against cached schema
     if schema is not None:
-        db_schema = {table["name"]: {col["name"]: col.get("type", "UNKNOWN") for col in table["columns"]} for table in schema}
+        db_schema = {
+            table["name"]: {col["name"]: col.get("type", "UNKNOWN") for col in table["columns"]}
+            for table in schema
+        }
 
         ctes = {cte.alias for cte in parsed.find_all(exp.CTE) if cte.alias}
         for table_node in parsed.find_all(exp.Table):
@@ -58,7 +63,9 @@ def validate_sql(sql: str, schema: list[dict[str, Any]] | None = None) -> str:
         except sqlglot.errors.OptimizeError as e:
             raise ValueError(f"Query validation failed: {e}") from e
 
-    return sqlglot.transpile(parsed.sql(dialect="postgres"), read="postgres", write="postgres", pretty=True)[0]
+    return sqlglot.transpile(
+        parsed.sql(dialect="postgres"), read="postgres", write="postgres", pretty=True
+    )[0]
 
 
 def limit_sql(sql: str, max_limit: int = 100) -> str:

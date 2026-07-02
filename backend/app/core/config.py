@@ -8,6 +8,14 @@ class Settings(BaseSettings):
     ENV: str = "development"
     EMBEDDING_PROVIDER: str = "local"
 
+    # Model Configurations
+    LLM_MODEL_NAME: str = "models/gemini-2.5-flash-lite"
+    SIMILARITY_THRESHOLD: float = 0.35
+
+    # Query Execution Limits
+    MAX_ROW_LIMIT: int = 100
+    STATEMENT_TIMEOUT_MS: int = 5000
+
     @field_validator("EMBEDDING_PROVIDER")
     @classmethod
     def validate_embedding_provider(cls, v: str) -> str:
@@ -28,6 +36,9 @@ class Settings(BaseSettings):
         if not v.strip():
             raise ValueError("GEMINI_API_KEY must not be empty")
         return v
+
+    # Redis Configuration
+    REDIS_URL: str
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

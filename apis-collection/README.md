@@ -27,8 +27,8 @@ The Queri.ai backend is an asynchronous FastAPI application that provides the fo
 
 * **GET `/health`**: Check the status of the API and environment.
 * **GET `/schema`**: Retrieves the cached database schema (tables and definitions) used for schema pruning and RAG.
-* **POST `/query/generate`**: Takes a natural language `question` and translates it into PostgreSQL using Gemini, returning both the `sql` and `reasoning`.
-* **POST `/query/execute`**: Takes a validated `sql` query, executes it safely (in a read-only transaction, limited to 100 rows, with a 5s statement timeout), and returns the `columns` and `rows`.
+* **POST `/query/generate`**: Takes a natural language `question` and translates it into PostgreSQL using Gemini, returning both the `sql` and `reasoning`. Accepts an optional `session_id` in the payload for conversational memory, and an `X-User-Role` header for RBAC masking.
+* **POST `/query/execute`**: Takes a validated `sql` query, executes it safely (in a read-only transaction, limited to 100 rows, with a 5s statement timeout), and returns the `columns` and `rows`. Accepts an `X-User-Role` header to enforce schema masking prior to execution.
 * **POST `/query/explain`**: Takes the `question`, `sql`, `columns`, and `rows` and generates a concise, conversational English explanation of the SQL results.
 
 ## For Backend Engineers (Maintaining the API)

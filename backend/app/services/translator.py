@@ -1,8 +1,10 @@
 import json
 import logging
+import os
 from typing import Any, cast
 
 import google.generativeai as genai
+import jinja2
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -10,100 +12,19 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 genai.configure(api_key=settings.GEMINI_API_KEY)  # type: ignore[attr-defined]
-_model = genai.GenerativeModel("models/gemini-2.5-flash-lite")  # type: ignore[attr-defined]
+_model = genai.GenerativeModel(settings.LLM_MODEL_NAME)  # type: ignore[attr-defined]
+
+jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__), "..", "templates", "prompts")),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 
 class TranslationResponse(BaseModel):
     reasoning: str = Field(description="Explanation of translation logic")
     sql: str = Field(description="The generated PostgreSQL query")
     tables_used: list[str] = Field(description="List of tables used in the SQL query")
-
-
-def _format_schema(schema: list[dict[str, Any]]) -> str:
-    lines: list[str] = []
-    for table in schema:
-        cols = "\n".join(f"  - {c['name']} ({c['type']})" for c in table["columns"])
-        lines.append(f"Table: {table['name']}\n{cols}")
-    return "\n\n".join(lines)
-
-
-_SYSTEM_PROMPT = (
-    "You are a PostgreSQL expert assistant. "
-    "Convert natural language questions into safe, read-only SQL queries."
-)
-
-
-def _build_prompt(
-    question: str,
-    schema_md: str,
-    few_shot_examples: list[dict[str, str]] | None = None,
-    business_rules: list[str] | None = None,
-) -> str:
-    rules_section = ""
-    if business_rules:
-        rules_lines = "\n".join(f"- {r}" for r in business_rules)
-        rules_section = f"\n## Business Rules\n{rules_lines}\n"
-
-    fewshot_section = ""
-    if few_shot_examples:
-        examples = "\n\n".join(f"Q: {ex['question']}\nSQL: {ex['sql']}" for ex in few_shot_examples)
-        fewshot_section = f"\n## Similar Query Examples\n{examples}\n"
-
-    return f"""{_SYSTEM_PROMPT}
-
-Database schema:
-{schema_md}
-{rules_section}{fewshot_section}
-Rules:
-1. Generate ONLY SELECT statements (or WITH ... SELECT for CTEs)
-2. NEVER generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, GRANT, REVOKE, or CREATE
-3. NEVER generate multiple statements
-4. Use proper PostgreSQL syntax
-5. If the question cannot be answered with a SELECT, respond with sql as "-- unable to answer"
-
-User question: {question}
-
-Return response matching the structured JSON response schema."""
-
-
-def _build_correction_prompt(
-    question: str,
-    schema_md: str,
-    previous_sql: str,
-    error_message: str,
-    few_shot_examples: list[dict[str, str]] | None = None,
-    business_rules: list[str] | None = None,
-) -> str:
-    rules_section = ""
-    if business_rules:
-        rules_lines = "\n".join(f"- {r}" for r in business_rules)
-        rules_section = f"\n## Business Rules\n{rules_lines}\n"
-
-    fewshot_section = ""
-    if few_shot_examples:
-        examples = "\n\n".join(f"Q: {ex['question']}\nSQL: {ex['sql']}" for ex in few_shot_examples)
-        fewshot_section = f"\n## Similar Query Examples\n{examples}\n"
-
-    return f"""You are a PostgreSQL expert assistant.
-The previous SQL query you generated for the user's question failed validation or execution.
-Correct the query and return a valid PostgreSQL query.
-
-Database schema:
-{schema_md}
-{rules_section}{fewshot_section}
-User's Original Question: {question}
-Failed SQL Query: {previous_sql}
-Error Message: {error_message}
-
-Rules:
-1. Generate ONLY SELECT statements (or WITH ... SELECT for CTEs)
-2. NEVER generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, GRANT, REVOKE, or CREATE
-3. NEVER generate multiple statements
-4. Use proper PostgreSQL syntax
-5. Fix the error described in the error message.
-   Ensure all table and column names exist in the schema.
-
-Return response matching the structured JSON response schema."""
 
 
 async def translate(
@@ -113,23 +34,27 @@ async def translate(
     error_message: str | None = None,
     few_shot_examples: list[dict[str, str]] | None = None,
     business_rules: list[str] | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    schema_md = _format_schema(schema)
     if previous_sql and error_message:
-        prompt = _build_correction_prompt(
-            question,
-            schema_md,
-            previous_sql,
-            error_message,
+        template = jinja_env.get_template("correct.j2")
+        prompt = template.render(
+            question=question,
+            schema=schema,
+            previous_sql=previous_sql,
+            error_message=error_message,
             few_shot_examples=few_shot_examples,
             business_rules=business_rules,
+            history=history,
         )
     else:
-        prompt = _build_prompt(
-            question,
-            schema_md,
+        template = jinja_env.get_template("generate.j2")
+        prompt = template.render(
+            question=question,
+            schema=schema,
             few_shot_examples=few_shot_examples,
             business_rules=business_rules,
+            history=history,
         )
 
     logger.info(
@@ -159,42 +84,17 @@ async def translate(
     return result
 
 
-_EXPLAIN_SYSTEM_PROMPT = (
-    "You are a helpful data analyst assistant. "
-    "Your task is to explain the results of a database query in clear, natural English."
-)
-
-
-def _build_explain_prompt(
-    question: str, sql: str, columns: list[str], rows: list[list[Any]]
-) -> str:
-    data_str = ""
-    if not rows:
-        data_str = "No rows returned."
-    else:
-        headers = " | ".join(columns)
-        divider = " | ".join(["---"] * len(columns))
-        row_lines = [" | ".join(map(str, r)) for r in rows]
-        data_str = f"| {headers} |\n| {divider} |\n" + "\n".join(f"| {rl} |" for rl in row_lines)
-
-    return f"""{_EXPLAIN_SYSTEM_PROMPT}
-
-User's Original Question: {question}
-SQL Query Executed: {sql}
-
-Query Results:
-{data_str}
-
-Provide a concise, user-friendly summary of these results in natural English
-that directly answers the user's question. Do not explain the SQL syntax
-or structure unless requested, just focus on what the data shows.
-"""
-
-
 async def explain(question: str, sql: str, columns: list[str], rows: list[list[Any]]) -> str:
-    # Cap rows to 100 to prevent prompt size blowup
-    capped_rows = rows[:100]
-    prompt = _build_explain_prompt(question, sql, columns, capped_rows)
+    # Cap rows to MAX_ROW_LIMIT to prevent prompt size blowup
+    capped_rows = rows[:settings.MAX_ROW_LIMIT]
+    template = jinja_env.get_template("explain.j2")
+    prompt = template.render(
+        question=question,
+        sql=sql,
+        columns=columns,
+        rows=capped_rows,
+    )
+
     logger.info("Sending Explain Prompt To Gemini (Question=%s)", question[:80])
     response = await _model.generate_content_async(prompt)
     if response.text is None:

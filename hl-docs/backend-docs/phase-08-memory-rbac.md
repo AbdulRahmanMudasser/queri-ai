@@ -29,7 +29,8 @@ This document controls execution for Phase 08, focusing on adding session conver
 ## 6. API & Data Contract Specifications
 * **Endpoints:**
   - `POST /api/v1/query/generate` with headers: `X-User-Role: Staff` or `X-User-Role: Admin`.
-  - Input body: `{"question": "Only confirmed ones", "session_id": "session-123"}`
+  - `POST /api/v1/query/execute` with headers: `X-User-Role: Staff` or `X-User-Role: Admin`.
+  - Input body for `/generate`: `{"question": "Only confirmed ones", "session_id": "session-123"}`
 
 ---
 
@@ -50,7 +51,7 @@ This document controls execution for Phase 08, focusing on adding session conver
 
 ### B. Controller / API Layer
 * [MODIFY] `backend/app/api/v1/endpoints/query.py`:
-  - Read role headers and support session identifiers in payloads.
+  - Read `x-user-role` headers on BOTH `/query/generate` and `/query/execute` and support session identifiers in payloads.
 
 ---
 
@@ -64,9 +65,10 @@ This document controls execution for Phase 08, focusing on adding session conver
 ### B. Functional Verification Matrix
 | State | Trigger Action | Expected Result | Response Code |
 | :--- | :--- | :--- | :--- |
-| RBAC Masking | User role: `Staff` query table `salaries` | Blocked during context assembly | 400 Bad Request |
+| RBAC Masking (Generate) | User role: `Staff` query table `salaries` | Blocked during context assembly | 400 Bad Request |
+| RBAC Masking (Execute) | Send `SELECT * FROM salaries` to `/query/execute` as `Staff` | AST Validator rejects missing table | 400 Bad Request |
 
 ## 12. Execution Notes
-* **Status:** Planned
-* **Started At:** 2026-07-01
-* **Completed At:** 2026-07-01
+* **Status:** Completed
+* **Started At:** 2026-07-02
+* **Completed At:** 2026-07-02

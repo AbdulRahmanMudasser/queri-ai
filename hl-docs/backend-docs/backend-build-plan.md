@@ -24,6 +24,8 @@ This document is the technical source of truth for the Backend API layer of Quer
 * **Templating:** Jinja2 (for prompt construction)
 * **Semantic Embeddings:** `fastembed` (for local, CPU-bound ONNX embedding generation)
 * **LLM SDK:** `google-generativeai` (Gemini API SDK for translation and embeddings)
+* **Dependency Manager:** Poetry
+* **Infrastructure:** Docker Compose (for local `pgvector` database provisioning)
 * **Testing Stack:** Pytest, pytest-asyncio, HTTPX (for client testing)
 
 ---
@@ -38,6 +40,8 @@ This document is the technical source of truth for the Backend API layer of Quer
 - Dynamically retrieving query-relevant schemas using adaptive cosine similarity score thresholds (score >= 0.35, with a top-3 fallback) to construct minimized prompts.
 - Forcing structured JSON schema output from Gemini to prevent parsing issues.
 - Parsing SQL strings into ASTs to check command allowlists, stacked queries, and verify column/table names against cached catalogs.
+- Managing Role-Based Access Control (RBAC) by physically masking database tables from AST catalogs and prompt builders for unauthorized roles.
+- Managing conversational session memory via an LRU-bounded state cache to allow for contextual follow-up questions.
 - Running a single-attempt self-correction query retry if execution throws errors.
 - Enforcing read-only transactions with timeouts and row limits.
 - Wrapping query results in structured, JSON-serializable payloads.
@@ -94,6 +98,24 @@ backend/
 
 ---
 
+## 4.5. Environment Configuration
+
+To run the Queri.ai backend, a `.env` file must be present in the `backend/` directory with the following variables:
+
+| Variable | Description | Requirement | Example |
+|---|---|---|---|
+| `DATABASE_URL` | PostgreSQL Async connection string | **Required** | `postgresql+asyncpg://user:pass@localhost:5432/db` |
+| `GEMINI_API_KEY` | Google AI Studio Key | **Required** | `AIzaSy...` |
+| `REDIS_URL` | Distributed cache for history/RAG | **Required** | `redis://localhost:6379` |
+| `ENV` | Environment mode | Optional | `development` |
+| `EMBEDDING_PROVIDER` | `local` or `gemini` | Optional | `local` |
+| `LLM_MODEL_NAME` | Configurable model string | Optional | `models/gemini-2.5-flash-lite` |
+| `SIMILARITY_THRESHOLD`| Cosine distance cutoff | Optional | `0.35` |
+| `MAX_ROW_LIMIT` | Hard limits applied via SQL AST | Optional | `100` |
+| `STATEMENT_TIMEOUT_MS`| Server-side query abortion timeout | Optional | `5000` |
+
+---
+
 ## 5. Lifespan and Connection Management
 * **Lifespan Manager:** The application uses FastAPI's `lifespan` context manager. On startup, it establishes the database engine connection pool and caches the database metadata in Redis. **Fail-Fast Policy:** If the database is unreachable or schema loading fails, the application will intentionally crash during startup to allow orchestration layers to restart it, preventing zombie states. On shutdown, it closes all active pools to avoid connection leaks.
 * **Dependency Injection:** Database sessions are fetched per request using a dependency helper injected into routers:
@@ -138,7 +160,7 @@ backend/
   * Traverse AST nodes and verify they only consist of `Select` or `With` command nodes.
   * Block statements containing syntax errors or multiple execution statements separated by semicolons (to block stacked query injection).
   * **AST Column and Table Verification:** Verify that every table and column node present in the AST matches our cached schema catalog. Any reference to unmapped database elements throws a validation exception.
-* **Role-Based Schema Masking:** Mask sensitive tables and columns from the schema context and similarity indexes depending on the user's role headers before passing them to the translation layer.
+* **Role-Based Schema Masking:** Mask sensitive tables and columns from the schema context and similarity indexes depending on the user's role headers before passing them to the translation layer. Furthermore, the `/query/execute` endpoint aggressively intercepts this header to validate manual queries against the strictly masked schema.
 * **Transaction Isolation:** Prepend `SET TRANSACTION READ ONLY` or run statements under a read-only connection cursor context.
 
 ---
@@ -171,7 +193,9 @@ backend/
   * **Harness tests (`tests/test_security.py`):** Run the validator service against a checklist of 50+ sql injection vectors, stacked queries, DDL, and DML keywords.
   * **Integration tests (`tests/test_routes.py`):** Test routes with mocked DB engine connections and mocked LLM API call responses to keep tests fast, deterministic, and cost-free.
 * **Verification Commands:**
+  - Local Infrastructure: `docker compose up -d`
   - Env Installation: `poetry install`
+  - Database Migrations: `poetry run alembic upgrade head`
   - Style & Format Check: `poetry run ruff check .` and `poetry run ruff format --check .`
   - Type Verification: `poetry run mypy app/`
   - Test Suite execution: `poetry run pytest`

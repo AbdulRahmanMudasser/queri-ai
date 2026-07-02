@@ -1,29 +1,32 @@
+import json
 import logging
-from copy import deepcopy
 from typing import Any, cast
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
+from app.core.cache import redis_client
 
-_schema_cache: dict[str, Any] | None = None
+logger = logging.getLogger(__name__)
 
 
 async def load_schema(db: AsyncSession) -> list[dict[str, Any]]:
     rows = await _fetch_schema(db)
-    tables = _populate_cache(rows)
+    tables = await _populate_cache(rows)
     logger.info("Schema Cache Populated With %d Tables", len(tables))
     return rows
 
 
-def get_cached_schema() -> list[dict[str, Any]]:
-    if _schema_cache is None:
+async def get_cached_schema() -> list[dict[str, Any]]:
+    if redis_client is None:
+        raise RuntimeError("Redis client not initialized")
+    cached = await redis_client.get("db_schema")
+    if not cached:
         raise RuntimeError("Schema cache not loaded")
-    return deepcopy(cast(list[dict[str, Any]], _schema_cache["tables"]))
+    return cast(list[dict[str, Any]], json.loads(cached))
 
 
-def _populate_cache(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+async def _populate_cache(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     tables: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         table_name = row["table_name"]
@@ -31,8 +34,8 @@ def _populate_cache(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         tables.setdefault(table_name, []).append(column_info)
 
     result = [{"name": table_name, "columns": columns} for table_name, columns in tables.items()]
-    global _schema_cache
-    _schema_cache = {"tables": result}
+    if redis_client:
+        await redis_client.set("db_schema", json.dumps(result))
     return result
 
 

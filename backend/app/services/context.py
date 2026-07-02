@@ -1,17 +1,17 @@
+import asyncio
 import hashlib
 import json
 import logging
 import math
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import redis_client
+from app.core.config import settings
 from app.services.embeddings import EmbeddingsProvider
 
 logger = logging.getLogger(__name__)
-
-# Global caches for schema embeddings
-_table_embeddings_cache: dict[str, dict[str, Any]] = {}
 
 
 def cosine_similarity(v1: list[float], v2: list[float]) -> float:
@@ -40,7 +40,6 @@ async def prune_schema(
     schema: list[dict[str, Any]],
     provider: EmbeddingsProvider,
 ) -> list[dict[str, Any]]:
-    global _table_embeddings_cache
 
     if not schema:
         return []
@@ -52,40 +51,51 @@ async def prune_schema(
     scored_tables = []
     for table in schema:
         table_name = table["name"]
-        
+
         # calculate table hash based only on this table's structure
         table_serialized = json.dumps(table, sort_keys=True)
         table_hash = hashlib.sha256(table_serialized.encode("utf-8")).hexdigest()
-        
-        cache_entry = _table_embeddings_cache.get(table_name)
-        if cache_entry is None or cache_entry["hash"] != table_hash:
-            logger.info("Table %s Hash Changed Or Cache Cold. Generating New Embedding.", table_name)
+
+        if redis_client is None:
+            raise RuntimeError("Redis client not initialized")
+
+        cache_data = await redis_client.get(f"table_emb:{table_name}")
+        cache_entry = json.loads(cache_data) if cache_data else None
+
+        if cache_entry is None or cache_entry.get("hash") != table_hash:
+            logger.info(
+                "Table %s Hash Changed Or Cache Cold. Generating New Embedding.", table_name
+            )
             desc = _get_table_description(table)
             emb = await provider.get_embedding(desc)
-            _table_embeddings_cache[table_name] = {"hash": table_hash, "embedding": emb}
+            cache_entry = {"hash": table_hash, "embedding": emb}
+            await redis_client.set(f"table_emb:{table_name}", json.dumps(cache_entry))
             table_emb = emb
         else:
             table_emb = cache_entry["embedding"]
 
         try:
-            score = cosine_similarity(question_emb, table_emb)
+            score = await asyncio.to_thread(cosine_similarity, question_emb, table_emb)
         except ValueError:
-            logger.warning("Embedding Dimension Mismatch In Cache. Regenerating Embedding for %s.", table_name)
+            logger.warning(
+                "Embedding Dimension Mismatch In Cache. Regenerating Embedding for %s.", table_name
+            )
             desc = _get_table_description(table)
             emb = await provider.get_embedding(desc)
-            _table_embeddings_cache[table_name] = {"hash": table_hash, "embedding": emb}
+            cache_entry = {"hash": table_hash, "embedding": emb}
+            await redis_client.set(f"table_emb:{table_name}", json.dumps(cache_entry))
             table_emb = emb
-            score = cosine_similarity(question_emb, table_emb)
-            
+            score = await asyncio.to_thread(cosine_similarity, question_emb, table_emb)
+
         scored_tables.append((score, table))
 
     # Sort scored tables descending by score
     scored_tables.sort(key=lambda x: x[0], reverse=True)
 
-    # Filter tables: threshold >= 0.35, fallback to top-3
-    pruned = [table for score, table in scored_tables if score >= 0.35]
+    # Filter tables: threshold >= settings.SIMILARITY_THRESHOLD, fallback to top-3
+    pruned = [table for score, table in scored_tables if score >= settings.SIMILARITY_THRESHOLD]
     if not pruned:
-        logger.info("No Tables Crossed The 0.35 Threshold. Falling Back To Top-3.")
+        logger.info(f"No Tables Crossed The {settings.SIMILARITY_THRESHOLD} Threshold. Falling Back To Top-3.")
         pruned = [table for score, table in scored_tables[:3]]
 
     pruned_names = {t["name"] for t in pruned}
@@ -116,10 +126,20 @@ async def get_few_shot_examples(
 
 
 async def get_business_rules(db: AsyncSession) -> list[str]:
+    if redis_client is None:
+        raise RuntimeError("Redis client not initialized")
+
+    cached = await redis_client.get("business_rules")
+    if cached:
+        return cast(list[str], json.loads(cached))
+
     from sqlalchemy import select
 
     from app.db.models import BusinessRule
 
     result = await db.execute(select(BusinessRule))
     rows = result.scalars().all()
-    return [row.rule_value for row in rows]
+    rules = [row.rule_value for row in rows]
+
+    await redis_client.set("business_rules", json.dumps(rules), ex=3600)
+    return rules
