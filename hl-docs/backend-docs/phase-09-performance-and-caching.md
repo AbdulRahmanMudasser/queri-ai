@@ -56,9 +56,9 @@ This document controls execution for Phase 09. The focus is to eliminate severe 
 * **Accessibility / Platform Constraints:** None
 
 ## 8. Acceptance Criteria
-- [ ] Schema context is cached in Redis instead of local `dict`.
-- [ ] Few-shot examples and business rules are cached with TTL.
-- [ ] `cosine_similarity` does not block the async event loop.
+- `[x]` Schema context is cached in Redis instead of local `dict`.
+- `[x]` Few-shot examples and business rules are cached with TTL.
+- `[x]` `cosine_similarity` does not block the async event loop.
 
 ## 9. Implementation Steps (Component Audit)
 
@@ -97,11 +97,12 @@ This document controls execution for Phase 09. The focus is to eliminate severe 
 | Cache Hit | Generate Query (2nd time) | Returns from Redis cache | 200 OK |
 
 ### C. Evidence To Capture
-- [Terminal output of pytest]
+- `pytest` executed successfully (70 tests passing).
+- See `walkthrough.md` for specific details.
 
 ## 12. Execution Notes
-* **Status:** Planned
-* **Started At:** July 2026
-* **Completed At:** July 2026
-* **Blockers Encountered:** None
-* **Notes:** None
+* **Status:** Completed
+* **Started At:** 2026-07-02
+* **Completed At:** 2026-07-02
+* **Blockers Encountered:** Redis initialization logic required `AsyncMock` patches in test suite. Fixed successfully.
+* **Notes:** All endpoints and tests fully reflect the new Redis architecture.
